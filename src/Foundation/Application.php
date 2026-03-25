@@ -3,6 +3,9 @@
 namespace Govorun\Foundation;
 
 use Dotenv\Dotenv;
+use Govorun\Contracts\MessengerDriver;
+use Govorun\Http\Request;
+use Govorun\Routing\Router;
 use Illuminate\Config\Repository as ConfigRepository;
 use Illuminate\Container\Container;
 
@@ -117,5 +120,50 @@ class Application extends Container
         foreach ($providers as $providerClass) {
             $this->register(new $providerClass($this));
         }
+    }
+
+    public function handleWebhook(Request $request): int
+    {
+        $driverName = $this->resolveDriverName($request);
+        $driver = $this->resolveDriver($driverName);
+
+        if (! $driver->verifyWebhook($request)) {
+            return 403;
+        }
+
+        $message = $driver->parseUpdate($request);
+
+        $router = new Router($driver);
+        $router->dispatch($message);
+
+        return 200;
+    }
+
+    protected function resolveDriverName(Request $request): string
+    {
+        $path = trim($request->path(), '/');
+        $segments = explode('/', $path);
+
+        return end($segments);
+    }
+
+    protected function resolveDriver(string $name): MessengerDriver
+    {
+        // Allow pre-bound driver by name (for testing)
+        if ($this->bound("driver.{$name}")) {
+            return $this->make("driver.{$name}");
+        }
+
+        // Allow globally-bound driver (for testing)
+        if ($this->bound(MessengerDriver::class)) {
+            return $this->make(MessengerDriver::class);
+        }
+
+        // Convention: Govorun\Drivers\Telegram\TelegramDriver
+        // All drivers take (array $config, ClientInterface $client) in constructor
+        $className = 'Govorun\\Drivers\\' . ucfirst($name) . '\\' . ucfirst($name) . 'Driver';
+        $config = $this->make('config')->get("messenger.{$name}", []);
+
+        return new $className(config: $config, client: new \GuzzleHttp\Client());
     }
 }
