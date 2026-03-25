@@ -371,20 +371,37 @@ class TelegramDriver implements MessengerDriver
 
     public function installWebhook(string $url): bool
     {
-        // Implemented in Task 3
-        return false;
+        $payload = ['url' => $url];
+
+        if ($this->secret !== null) {
+            $payload['secret_token'] = $this->secret;
+        }
+
+        $result = $this->apiCall('setWebhook', $payload);
+
+        return ($result['ok'] ?? false) === true;
     }
 
     public function removeWebhook(): bool
     {
-        // Implemented in Task 3
-        return false;
+        $result = $this->apiCall('deleteWebhook', []);
+
+        return ($result['ok'] ?? false) === true;
     }
 
     public function getUser(string $id): UserDto
     {
-        // Implemented in Task 3
-        return new UserDto(id: $id);
+        $result = $this->apiCall('getChat', ['chat_id' => $id]);
+        $data = $result['result'] ?? [];
+
+        return new UserDto(
+            id: (string) ($data['id'] ?? $id),
+            firstName: $data['first_name'] ?? null,
+            lastName: $data['last_name'] ?? null,
+            username: $data['username'] ?? null,
+            locale: $data['language_code'] ?? null,
+            raw: $data,
+        );
     }
 
     protected function apiUrl(string $method): string
