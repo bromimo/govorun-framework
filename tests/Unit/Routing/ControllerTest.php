@@ -9,6 +9,9 @@ use Govorun\Messaging\IncomingMessage;
 use Govorun\Messaging\Message;
 use Govorun\Messaging\OutgoingMessage;
 use Govorun\Routing\Controller;
+use Govorun\State\FileStateStorage;
+use Govorun\State\Flow;
+use Govorun\State\Step;
 use Govorun\Tests\TestCase;
 
 class ControllerTest extends TestCase
@@ -113,5 +116,60 @@ class ControllerTest extends TestCase
         };
         $controller->setContext($msg, $driver);
         $this->assertNull($controller->test());
+    }
+
+    public function test_start_flow_persists_state(): void
+    {
+        $tmpDir = sys_get_temp_dir() . '/govorun_test_' . uniqid();
+        $storage = new FileStateStorage($tmpDir);
+
+        $driver = $this->createMock(MessengerDriver::class);
+        $driver->expects($this->once())
+            ->method('send')
+            ->with($this->callback(function (OutgoingMessage $msg) {
+                return $msg->text === 'Enter your name:' && $msg->chatId === 'chat1';
+            }));
+
+        $msg = $this->makeMessage('hello');
+
+        $controller = new TestFlowController();
+        $controller->setContext($msg, $driver);
+        $controller->setStateStorage($storage);
+        $controller->handle();
+
+        $state = $storage->get('chat1', 'telegram');
+        $this->assertNotNull($state);
+        $this->assertSame('name', $state['current_step']);
+        $this->assertSame(ControllerTestFlow::class, $state['flow_class']);
+
+        // Cleanup
+        array_map('unlink', glob($tmpDir . '/*'));
+        @rmdir($tmpDir);
+    }
+}
+
+class ControllerTestFlow extends Flow
+{
+    protected array $steps = ['name'];
+
+    public function nameStep(Step $step): void
+    {
+        $step->ask('Enter your name:');
+        $step->receive(function (IncomingMessage $message) {
+            $this->nextStep();
+        });
+    }
+
+    public function onComplete(): void
+    {
+        $this->reply('Done!');
+    }
+}
+
+class TestFlowController extends Controller
+{
+    public function handle(): void
+    {
+        $this->startFlow(ControllerTestFlow::class);
     }
 }

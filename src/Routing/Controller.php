@@ -3,15 +3,18 @@
 namespace Govorun\Routing;
 
 use Govorun\Contracts\MessengerDriver;
+use Govorun\Contracts\StateStorage;
 use Govorun\Messaging\Dto\UserDto;
 use Govorun\Messaging\IncomingMessage;
 use Govorun\Messaging\Message;
 use Govorun\Messaging\OutgoingMessage;
+use Govorun\State\Flow;
 
 abstract class Controller
 {
     protected IncomingMessage $incomingMessage;
     protected MessengerDriver $driver;
+    protected ?StateStorage $stateStorage = null;
 
     public function setContext(IncomingMessage $message, MessengerDriver $driver): void
     {
@@ -56,5 +59,28 @@ abstract class Controller
     protected function param(string $key): ?string
     {
         return $this->incomingMessage->actionParams[$key] ?? null;
+    }
+
+    public function setStateStorage(StateStorage $storage): void
+    {
+        $this->stateStorage = $storage;
+    }
+
+    protected function startFlow(string $flowClass): void
+    {
+        $storage = $this->resolveStateStorage();
+
+        /** @var Flow $flow */
+        $flow = new $flowClass($storage, $this->driver, $this->incomingMessage);
+        $flow->start();
+    }
+
+    protected function resolveStateStorage(): StateStorage
+    {
+        if ($this->stateStorage !== null) {
+            return $this->stateStorage;
+        }
+
+        return app(\Govorun\Contracts\StateStorage::class);
     }
 }
