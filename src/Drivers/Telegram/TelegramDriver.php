@@ -34,7 +34,7 @@ class TelegramDriver implements MessengerDriver
 
         $header = $request->header('X-Telegram-Bot-Api-Secret-Token');
 
-        return $header === $this->secret;
+        return $header !== null && hash_equals($this->secret, $header);
     }
 
     public function parseUpdate(Request $request): IncomingMessage
@@ -43,6 +43,10 @@ class TelegramDriver implements MessengerDriver
 
         if (isset($data['callback_query'])) {
             return $this->parseCallbackQuery($data);
+        }
+
+        if (!isset($data['message'])) {
+            throw new \RuntimeException('Unsupported Telegram update type');
         }
 
         return $this->parseMessage($data);
@@ -198,7 +202,8 @@ class TelegramDriver implements MessengerDriver
     private function parseMedia(array $message, string $type): MediaDto
     {
         if ($type === 'photo') {
-            $photo = end($message['photo']); // largest size
+            $photos = $message['photo'];
+            $photo = end($photos); // largest size
             return new MediaDto(
                 type: 'photo',
                 fileId: $photo['file_id'],
