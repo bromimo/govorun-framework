@@ -387,8 +387,6 @@ class TelegramDriver implements MessengerDriver
         return new UserDto(id: $id);
     }
 
-    // --- Helper for API calls (used by Tasks 2-3) ---
-
     protected function apiUrl(string $method): string
     {
         return "https://api.telegram.org/bot{$this->token}/{$method}";
