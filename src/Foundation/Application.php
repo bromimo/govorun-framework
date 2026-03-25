@@ -134,6 +134,15 @@ class Application extends Container
         $message = $driver->parseUpdate($request);
 
         try {
+            $flowHandler = new \Govorun\State\FlowHandler(
+                $this->resolveStateStorage(),
+                $driver,
+            );
+
+            if ($flowHandler->handle($message)) {
+                return 200;
+            }
+
             $router = new Router($driver);
             $router->dispatch($message);
         } catch (\Throwable $e) {
@@ -155,6 +164,15 @@ class Application extends Container
             // If even the error response fails, silently swallow —
             // we must return 200 to prevent messenger retries
         }
+    }
+
+    protected function resolveStateStorage(): \Govorun\Contracts\StateStorage
+    {
+        if ($this->bound(\Govorun\Contracts\StateStorage::class)) {
+            return $this->make(\Govorun\Contracts\StateStorage::class);
+        }
+
+        return new \Govorun\State\FileStateStorage($this->storagePath('state'));
     }
 
     protected function resolveDriverName(Request $request): string
