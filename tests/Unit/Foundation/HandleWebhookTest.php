@@ -152,6 +152,45 @@ class HandleWebhookTest extends TestCase
         $this->assertSame(200, $result);
         $this->assertCount(1, $this->sent);
     }
+
+    public function test_handle_webhook_catches_exception_and_sends_error_message(): void
+    {
+        $message = $this->makeIncomingMessage('/crash');
+        $driver = $this->makeFakeDriver($message);
+        $this->app->instance(MessengerDriver::class, $driver);
+
+        Route::command('crash', TestCrashController::class);
+
+        $request = new Request(
+            server: ['REQUEST_URI' => '/webhook/telegram'],
+            content: '{}',
+        );
+
+        $result = $this->app->handleWebhook($request);
+
+        $this->assertSame(200, $result);
+        $this->assertCount(1, $this->sent);
+        // Default error message from config/app.php
+        $this->assertSame('Произошла ошибка, попробуйте позже.', $this->sent[0]->text);
+    }
+
+    public function test_handle_webhook_returns_200_even_on_exception(): void
+    {
+        $message = $this->makeIncomingMessage('/crash');
+        $driver = $this->makeFakeDriver($message);
+        $this->app->instance(MessengerDriver::class, $driver);
+
+        Route::command('crash', TestCrashController::class);
+
+        $request = new Request(
+            server: ['REQUEST_URI' => '/webhook/telegram'],
+            content: '{}',
+        );
+
+        $result = $this->app->handleWebhook($request);
+
+        $this->assertSame(200, $result);
+    }
 }
 
 class TestStartController extends Controller
@@ -159,5 +198,13 @@ class TestStartController extends Controller
     public function handle(): void
     {
         $this->reply('Welcome!');
+    }
+}
+
+class TestCrashController extends Controller
+{
+    public function handle(): void
+    {
+        throw new \RuntimeException('Something went wrong');
     }
 }

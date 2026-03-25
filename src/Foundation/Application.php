@@ -133,10 +133,28 @@ class Application extends Container
 
         $message = $driver->parseUpdate($request);
 
-        $router = new Router($driver);
-        $router->dispatch($message);
+        try {
+            $router = new Router($driver);
+            $router->dispatch($message);
+        } catch (\Throwable $e) {
+            $this->handleException($e, $message, $driver);
+        }
 
         return 200;
+    }
+
+    protected function handleException(\Throwable $e, \Govorun\Messaging\IncomingMessage $message, MessengerDriver $driver): void
+    {
+        $errorMessage = $this->make('config')->get('app.error_message', 'An error occurred.');
+
+        try {
+            $reply = \Govorun\Messaging\Message::make($errorMessage);
+            $reply->chatId = $message->chatId;
+            $driver->send($reply);
+        } catch (\Throwable) {
+            // If even the error response fails, silently swallow —
+            // we must return 200 to prevent messenger retries
+        }
     }
 
     protected function resolveDriverName(Request $request): string
