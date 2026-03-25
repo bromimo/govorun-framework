@@ -222,21 +222,151 @@ class TelegramDriver implements MessengerDriver
         );
     }
 
-    // --- Stubs for Task 2 ---
-
     public function send(OutgoingMessage $message): void
     {
-        // Implemented in Task 2
+        if ($message->media !== null) {
+            $this->sendMedia($message);
+            return;
+        }
+
+        $payload = [
+            'chat_id' => $message->chatId,
+            'text' => $message->text ?? '',
+        ];
+
+        if ($message->parseMode !== null) {
+            $payload['parse_mode'] = $message->parseMode;
+        }
+
+        if ($message->keyboard !== null) {
+            $payload['reply_markup'] = $this->buildKeyboardMarkup($message->keyboard);
+        }
+
+        $this->apiCall('sendMessage', $payload);
     }
 
     public function edit(string $messageId, OutgoingMessage $message): void
     {
-        // Implemented in Task 2
+        $payload = [
+            'chat_id' => $message->chatId,
+            'message_id' => (int) $messageId,
+            'text' => $message->text ?? '',
+        ];
+
+        if ($message->parseMode !== null) {
+            $payload['parse_mode'] = $message->parseMode;
+        }
+
+        if ($message->keyboard !== null) {
+            $payload['reply_markup'] = $this->buildKeyboardMarkup($message->keyboard);
+        }
+
+        $this->apiCall('editMessageText', $payload);
     }
 
     public function delete(string $messageId, string $chatId): void
     {
-        // Implemented in Task 2
+        $this->apiCall('deleteMessage', [
+            'chat_id' => $chatId,
+            'message_id' => (int) $messageId,
+        ]);
+    }
+
+    private function sendMedia(OutgoingMessage $message): void
+    {
+        $media = $message->media;
+        $type = $media['type'];
+
+        $methodMap = [
+            'photo' => 'sendPhoto',
+            'document' => 'sendDocument',
+            'voice' => 'sendVoice',
+            'video' => 'sendVideo',
+            'audio' => 'sendAudio',
+            'animation' => 'sendAnimation',
+            'sticker' => 'sendSticker',
+        ];
+
+        $method = $methodMap[$type] ?? 'sendDocument';
+
+        $payload = [
+            'chat_id' => $message->chatId,
+            $type => $media['url'],
+        ];
+
+        if ($message->text !== null) {
+            $payload['caption'] = $message->text;
+        }
+
+        if ($message->parseMode !== null) {
+            $payload['parse_mode'] = $message->parseMode;
+        }
+
+        $this->apiCall($method, $payload);
+    }
+
+    private function buildKeyboardMarkup(array $keyboard): array
+    {
+        if ($keyboard['remove']) {
+            return ['remove_keyboard' => true];
+        }
+
+        $rows = [];
+        foreach ($keyboard['rows'] as $row) {
+            $buttons = [];
+            foreach ($row as $btn) {
+                $buttons[] = $this->buildButton($btn, $keyboard['type']);
+            }
+            $rows[] = $buttons;
+        }
+
+        if ($keyboard['type'] === 'reply') {
+            return ['keyboard' => $rows, 'resize_keyboard' => true, 'one_time_keyboard' => true];
+        }
+
+        return ['inline_keyboard' => $rows];
+    }
+
+    private function buildButton(array $btn, string $keyboardType): array
+    {
+        $result = ['text' => $btn['text']];
+
+        if ($keyboardType === 'reply') {
+            if (!empty($btn['requestContact'])) {
+                $result['request_contact'] = true;
+            }
+            if (!empty($btn['requestLocation'])) {
+                $result['request_location'] = true;
+            }
+            return $result;
+        }
+
+        // Inline button
+        if (isset($btn['url'])) {
+            $result['url'] = $btn['url'];
+        } elseif (isset($btn['action'])) {
+            $result['callback_data'] = $this->buildCallbackData($btn['action'], $btn['param'] ?? []);
+        }
+
+        return $result;
+    }
+
+    private function buildCallbackData(string $action, array $params): string
+    {
+        $parts = ['act:' . $action];
+        foreach ($params as $key => $value) {
+            $parts[] = $key . ':' . $value;
+        }
+        return implode(';', $parts);
+    }
+
+    private function apiCall(string $method, array $payload): array
+    {
+        $response = $this->client->request('POST', $this->apiUrl($method), [
+            'json' => $payload,
+        ]);
+
+        return json_decode($response->getBody()->getContents(), true) ?? [];
     }
 
     public function installWebhook(string $url): bool
