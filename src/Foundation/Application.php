@@ -2,6 +2,8 @@
 
 namespace Govorun\Foundation;
 
+use Dotenv\Dotenv;
+use Illuminate\Config\Repository as ConfigRepository;
 use Illuminate\Container\Container;
 
 class Application extends Container
@@ -87,5 +89,33 @@ class Application extends Container
     public function isBooted(): bool
     {
         return $this->booted;
+    }
+
+    public function loadEnvironment(): void
+    {
+        if (file_exists($this->basePath('.env'))) {
+            Dotenv::createImmutable($this->basePath())->load();
+        }
+    }
+
+    public function loadConfiguration(): void
+    {
+        $config = new ConfigRepository();
+
+        foreach (glob($this->configPath('*.php')) ?: [] as $file) {
+            $key = basename($file, '.php');
+            $config->set($key, require $file);
+        }
+
+        $this->instance('config', $config);
+    }
+
+    public function registerConfiguredProviders(): void
+    {
+        $providers = $this->make('config')->get('app.providers', []);
+
+        foreach ($providers as $providerClass) {
+            $this->register(new $providerClass($this));
+        }
     }
 }
