@@ -8,6 +8,7 @@ use Govorun\Events\EventServiceProvider;
 use Govorun\Http\Request;
 use Govorun\Log\LogServiceProvider;
 use Govorun\Routing\Router;
+use Govorun\State\StateServiceProvider;
 use Illuminate\Config\Repository as ConfigRepository;
 use Illuminate\Container\Container;
 
@@ -119,6 +120,7 @@ class Application extends Container
     {
         $this->register(new EventServiceProvider($this));
         $this->register(new LogServiceProvider($this));
+        $this->register(new StateServiceProvider($this));
     }
 
     public function registerConfiguredProviders(): void
