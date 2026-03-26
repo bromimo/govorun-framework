@@ -4,7 +4,9 @@ namespace Govorun\Foundation;
 
 use Dotenv\Dotenv;
 use Govorun\Contracts\MessengerDriver;
+use Govorun\Events\EventServiceProvider;
 use Govorun\Http\Request;
+use Govorun\Log\LogServiceProvider;
 use Govorun\Routing\Router;
 use Illuminate\Config\Repository as ConfigRepository;
 use Illuminate\Container\Container;
@@ -111,6 +113,12 @@ class Application extends Container
         }
 
         $this->instance('config', $config);
+    }
+
+    public function registerCoreProviders(): void
+    {
+        $this->register(new EventServiceProvider($this));
+        $this->register(new LogServiceProvider($this));
     }
 
     public function registerConfiguredProviders(): void
