@@ -30,14 +30,19 @@ class LogServiceProvider extends ServiceProvider
         return $this->resolveChannel($defaultChannel, $channelConfig, $channels);
     }
 
-    private function resolveChannel(string $name, array $config, array $allChannels): Logger
+    private function resolveChannel(string $name, array $config, array $allChannels, array &$resolved = []): Logger
     {
+        if (isset($resolved[$name])) {
+            throw new \RuntimeException("Circular channel reference detected: {$name}");
+        }
+
+        $resolved[$name] = true;
         $driver = $config['driver'] ?? 'single';
 
         return match ($driver) {
             'single' => $this->createSingleChannel($name, $config),
             'daily' => $this->createDailyChannel($name, $config),
-            'stack' => $this->createStackChannel($name, $config, $allChannels),
+            'stack' => $this->createStackChannel($name, $config, $allChannels, $resolved),
             default => $this->createSingleChannel($name, $config),
         };
     }
@@ -65,14 +70,14 @@ class LogServiceProvider extends ServiceProvider
         return $logger;
     }
 
-    private function createStackChannel(string $name, array $config, array $allChannels): Logger
+    private function createStackChannel(string $name, array $config, array $allChannels, array &$resolved = []): Logger
     {
         $logger = new Logger($name);
         $stackChannelNames = $config['channels'] ?? [];
 
         foreach ($stackChannelNames as $channelName) {
             $channelConfig = $allChannels[$channelName] ?? [];
-            $sub = $this->resolveChannel($channelName, $channelConfig, $allChannels);
+            $sub = $this->resolveChannel($channelName, $channelConfig, $allChannels, $resolved);
 
             foreach ($sub->getHandlers() as $handler) {
                 $logger->pushHandler($handler);
