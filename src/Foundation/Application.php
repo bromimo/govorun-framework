@@ -162,6 +162,15 @@ class Application extends Container
 
     protected function handleException(\Throwable $e, \Govorun\Messaging\IncomingMessage $message, MessengerDriver $driver): void
     {
+        if ($this->bound('log')) {
+            $this->make('log')->error($e->getMessage(), [
+                'exception' => get_class($e),
+                'user' => $message->user->id ?? null,
+                'chat_id' => $message->chatId,
+                'driver' => $message->driverName,
+            ]);
+        }
+
         $errorMessage = $this->make('config')->get('app.error_message', 'An error occurred.');
 
         try {

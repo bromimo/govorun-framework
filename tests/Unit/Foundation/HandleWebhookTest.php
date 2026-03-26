@@ -191,6 +191,40 @@ class HandleWebhookTest extends TestCase
 
         $this->assertSame(200, $result);
     }
+
+    public function test_handle_exception_logs_error_when_logger_available(): void
+    {
+        $this->app->registerCoreProviders();
+        $this->app->boot();
+
+        $logFile = sys_get_temp_dir() . '/govorun-test.log';
+        if (file_exists($logFile)) {
+            unlink($logFile);
+        }
+
+        $message = $this->makeIncomingMessage('/crash');
+        $driver = $this->makeFakeDriver($message);
+        $this->app->instance(MessengerDriver::class, $driver);
+
+        Route::command('crash', TestCrashController::class);
+
+        $request = new Request(
+            server: ['REQUEST_URI' => '/webhook/telegram'],
+            content: '{}',
+        );
+
+        $this->app->handleWebhook($request);
+
+        $this->assertFileExists($logFile);
+        $this->assertStringContainsString('Something went wrong', file_get_contents($logFile));
+
+        // Cleanup
+        $this->app->flush();
+        gc_collect_cycles();
+        if (file_exists($logFile)) {
+            unlink($logFile);
+        }
+    }
 }
 
 class TestStartController extends Controller
