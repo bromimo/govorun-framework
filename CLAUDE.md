@@ -27,6 +27,7 @@ src/
     Routing/          # Route (static DSL), Router (priority dispatch), Controller, Middleware
     State/            # Flow, Step, FlowHandler, File/Database/CacheStateStorage, StateServiceProvider
     Support/          # helpers.php (app, config, env, event, base_path, etc.)
+    Testing/          # TestCase, FakeMessenger, FakeDriver, FakeApiClient, InteractsWithMessenger, InteractsWithApi
 ```
 
 ## Conventions
@@ -59,4 +60,4 @@ src/
 | 8 | Events & Logging | Done |
 | 9 | Database & State Storage (migration, DatabaseStateStorage, CacheStateStorage, StateServiceProvider) | Done |
 | 10 | Console Commands (webhook:install/remove, migrate, make:*, state:clear, test) | Done |
-| 11 | Testing Helpers (fakeMessenger, fakeApi) | Not Started |
+| 11 | Testing Helpers (fakeMessenger, fakeApi) | Done |
