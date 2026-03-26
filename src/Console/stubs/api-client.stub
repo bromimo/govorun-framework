@@ -1,0 +1,20 @@
+<?php
+
+namespace App\Services;
+
+use Govorun\Http\ApiClient;
+
+class DummyClass extends ApiClient
+{
+    protected function baseUrl(): string
+    {
+        return config('api.service.url');
+    }
+
+    protected function headers(): array
+    {
+        return [
+            'Authorization' => 'Bearer ' . config('api.service.token'),
+        ];
+    }
+}

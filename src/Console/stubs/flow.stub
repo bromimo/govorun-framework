@@ -1,0 +1,26 @@
+<?php
+
+namespace App\Flows;
+
+use Govorun\State\Flow;
+use Govorun\State\Step;
+
+class DummyClass extends Flow
+{
+    protected array $steps = ['first'];
+
+    public function firstStep(Step $step): void
+    {
+        $step->ask('Enter your response:');
+
+        $step->receive(function ($message) {
+            $this->reply('Received: ' . $message->text);
+            $this->nextStep();
+        });
+    }
+
+    public function onComplete(): void
+    {
+        $this->reply('Done!');
+    }
+}

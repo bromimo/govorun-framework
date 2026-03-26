@@ -11,7 +11,25 @@ class MakeFlowCommand extends Command
 
     public function handle(): int
     {
-        $this->info('Not yet implemented.');
+        $name = $this->argument('name');
+        $stub = file_get_contents(__DIR__ . '/stubs/flow.stub');
+        $content = str_replace('DummyClass', $name, $stub);
+
+        $dir = app()->basePath('app/Flows');
+        if (! is_dir($dir)) {
+            mkdir($dir, 0777, true);
+        }
+
+        $path = $dir . "/{$name}.php";
+
+        if (file_exists($path)) {
+            $this->error("Flow {$name} already exists!");
+            return self::FAILURE;
+        }
+
+        file_put_contents($path, $content);
+        $this->info("Flow created: app/Flows/{$name}.php");
+
         return self::SUCCESS;
     }
 }

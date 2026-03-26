@@ -1,0 +1,13 @@
+<?php
+
+namespace App\Controllers;
+
+use Govorun\Routing\Controller;
+
+class DummyClass extends Controller
+{
+    public function handle(): void
+    {
+        $this->reply('Hello!');
+    }
+}
