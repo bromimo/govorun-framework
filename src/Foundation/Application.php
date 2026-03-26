@@ -97,6 +97,11 @@ class Application extends Container
         return $this->booted;
     }
 
+    public function runningUnitTests(): bool
+    {
+        return defined('PHPUNIT_COMPOSER_INSTALL') || defined('__PHPUNIT_PHAR__');
+    }
+
     public function loadEnvironment(): void
     {
         if (file_exists($this->basePath('.env'))) {
