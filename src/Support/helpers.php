@@ -86,8 +86,8 @@ if (! function_exists('database_path')) {
 }
 
 if (! function_exists('event')) {
-    function event(object $event, mixed ...$payload): void
+    function event(string|object $event, mixed $payload = [], bool $halt = false): mixed
     {
-        app('events')->dispatch($event, ...$payload);
+        return app('events')->dispatch($event, $payload, $halt);
     }
 }
