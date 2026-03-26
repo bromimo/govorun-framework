@@ -16,7 +16,7 @@ Multi-messenger bot framework for PHP 8.3. Architecture: core (`govorun/framewor
 src/
     Console/          # Artisan-like commands (not yet implemented)
     Contracts/        # Interfaces: MessengerDriver, StateStorage
-    Database/         # Migrations, models (not yet implemented)
+    Database/         # Migrations (CreateGovorunStatesTable)
     Drivers/Telegram/ # TelegramDriver — first messenger implementation
     Events/           # EventServiceProvider — Dispatcher registration, listener mapping from config
     Exceptions/       # SendFailedException, ApiException
@@ -25,7 +25,7 @@ src/
     Log/              # LogServiceProvider (single/daily/stack channels), Log facade
     Messaging/        # IncomingMessage, OutgoingMessage, Message, Button, Keyboard, Media, DTOs
     Routing/          # Route (static DSL), Router (priority dispatch), Controller, Middleware
-    State/            # Flow, Step, FlowHandler, FileStateStorage, StateData
+    State/            # Flow, Step, FlowHandler, File/Database/CacheStateStorage, StateServiceProvider
     Support/          # helpers.php (app, config, env, event, base_path, etc.)
 ```
 
@@ -39,7 +39,9 @@ src/
 - **Helpers:** Global functions in `src/Support/helpers.php` — `app()`, `config()`, `env()`, `event()`, path helpers
 - **Log facade:** `Govorun\Log\Log::info()`, `Log::error()`, etc. — static access to PSR-3 logger
 - **Service Providers:** Extend `Govorun\Foundation\ServiceProvider`, implement `register()` and `boot()`
-- **Core Providers:** `Application::registerCoreProviders()` registers EventServiceProvider + LogServiceProvider
+- **Core Providers:** `Application::registerCoreProviders()` registers EventServiceProvider + LogServiceProvider + StateServiceProvider
+- **State config:** `config/state.php` — `driver` (file/database/cache), `ttl` (seconds). StateServiceProvider resolves the right storage
+- **Database tests:** Use SQLite in-memory via `Illuminate\Database\Capsule\Manager`
 - **Windows tests:** Use `$this->app->flush()` and `gc_collect_cycles()` in tearDown before unlinking log files
 - **Commits:** Conventional commits — `feat:`, `fix:`, `chore:`, `docs:`
 
@@ -55,6 +57,6 @@ src/
 | 6 | API Client | Done |
 | 7 | State Management (Flow, Step, FlowHandler, FileStateStorage) | Done |
 | 8 | Events & Logging | Done |
-| 9 | Database (migrations, DatabaseStateStorage, CacheStateStorage) | Not Started |
+| 9 | Database & State Storage (migration, DatabaseStateStorage, CacheStateStorage, StateServiceProvider) | Done |
 | 10 | Console Commands | Not Started |
 | 11 | Testing Helpers (fakeMessenger, fakeApi) | Not Started |
