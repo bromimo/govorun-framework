@@ -14,7 +14,7 @@ Multi-messenger bot framework for PHP 8.3. Architecture: core (`govorun/framewor
 
 ```
 src/
-    Console/          # Artisan-like commands (not yet implemented)
+    Console/          # ConsoleServiceProvider, 8 commands (webhook:*, migrate, make:*, state:clear, test), stubs/
     Contracts/        # Interfaces: MessengerDriver, StateStorage
     Database/         # Migrations (CreateGovorunStatesTable)
     Drivers/Telegram/ # TelegramDriver — first messenger implementation
@@ -58,5 +58,5 @@ src/
 | 7 | State Management (Flow, Step, FlowHandler, FileStateStorage) | Done |
 | 8 | Events & Logging | Done |
 | 9 | Database & State Storage (migration, DatabaseStateStorage, CacheStateStorage, StateServiceProvider) | Done |
-| 10 | Console Commands | Not Started |
+| 10 | Console Commands (webhook:install/remove, migrate, make:*, state:clear, test) | Done |
 | 11 | Testing Helpers (fakeMessenger, fakeApi) | Not Started |
