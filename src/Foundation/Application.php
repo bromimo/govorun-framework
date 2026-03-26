@@ -132,6 +132,18 @@ class Application extends Container
         }
     }
 
+    public function handleConsole(): int
+    {
+        $this->loadEnvironment();
+        $this->loadConfiguration();
+        $this->registerCoreProviders();
+        $this->register(new \Govorun\Console\ConsoleServiceProvider($this));
+        $this->registerConfiguredProviders();
+        $this->boot();
+
+        return $this->make('artisan')->run();
+    }
+
     public function handleWebhook(Request $request): int
     {
         $driverName = $this->resolveDriverName($request);
