@@ -4,11 +4,17 @@ namespace Govorun\Console;
 
 use Illuminate\Console\Command;
 
+/** Команда удаления вебхуков для активных мессенджер-драйверов.
+ * Перебирает настроенные драйверы и удаляет зарегистрированные вебхуки.
+ */
 class WebhookRemoveCommand extends Command
 {
     protected $signature = 'webhook:remove';
     protected $description = 'Remove webhooks for active messenger drivers';
 
+    /** Удалить вебхуки для всех настроенных мессенджер-драйверов.
+     * @return int
+     */
     public function handle(): int
     {
         $config = app('config');
@@ -38,6 +44,10 @@ class WebhookRemoveCommand extends Command
         return self::SUCCESS;
     }
 
+    /** Разрешить экземпляр драйвера мессенджера по имени.
+     * @param string $name Имя драйвера
+     * @return \Govorun\Contracts\MessengerDriver
+     */
     private function resolveDriver(string $name): \Govorun\Contracts\MessengerDriver
     {
         $app = app();

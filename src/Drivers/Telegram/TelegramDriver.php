@@ -2,22 +2,34 @@
 
 namespace Govorun\Drivers\Telegram;
 
-use Govorun\Contracts\MessengerDriver;
 use Govorun\Http\Request;
 use Govorun\Messaging\ContentType;
-use Govorun\Messaging\Dto\ContactDto;
-use Govorun\Messaging\Dto\LocationDto;
-use Govorun\Messaging\Dto\MediaDto;
 use Govorun\Messaging\Dto\UserDto;
+use Govorun\Messaging\Dto\MediaDto;
+use Govorun\Messaging\Dto\ContactDto;
+use GuzzleHttp\ClientInterface;
+use Govorun\Messaging\Dto\LocationDto;
 use Govorun\Messaging\IncomingMessage;
 use Govorun\Messaging\OutgoingMessage;
-use GuzzleHttp\ClientInterface;
+use Govorun\Contracts\MessengerDriver;
 
+/** Драйвер мессенджера Telegram.
+ * Реализует взаимодействие с Telegram Bot API: разбор входящих обновлений,
+ * отправку/редактирование/удаление сообщений, управление вебхуками
+ * и получение информации о пользователях.
+ */
 class TelegramDriver implements MessengerDriver
 {
+    /** @var string Токен бота */
     private string $token;
+
+    /** @var string|null Секретный ключ для верификации вебхуков */
     private ?string $secret;
 
+    /** Создать экземпляр драйвера Telegram.
+     * @param array<string, mixed> $config Конфигурация драйвера (token, secret)
+     * @param ClientInterface $client HTTP-клиент для запросов к API
+     */
     public function __construct(
         private array $config,
         private ClientInterface $client,
@@ -26,6 +38,10 @@ class TelegramDriver implements MessengerDriver
         $this->secret = $config['secret'] ?? null;
     }
 
+    /** Проверить подлинность входящего вебхук-запроса.
+     * @param Request $request Входящий HTTP-запрос
+     * @return bool Результат верификации
+     */
     public function verifyWebhook(Request $request): bool
     {
         if ($this->secret === null) {
@@ -37,6 +53,11 @@ class TelegramDriver implements MessengerDriver
         return $header !== null && hash_equals($this->secret, $header);
     }
 
+    /** Разобрать входящий вебхук-запрос в объект сообщения.
+     * @param Request $request Входящий HTTP-запрос
+     * @return IncomingMessage Разобранное входящее сообщение
+     * @throws \RuntimeException Если тип обновления не поддерживается
+     */
     public function parseUpdate(Request $request): IncomingMessage
     {
         $data = $request->json();
@@ -52,6 +73,10 @@ class TelegramDriver implements MessengerDriver
         return $this->parseMessage($data);
     }
 
+    /** Разобрать callback-запрос (нажатие inline-кнопки).
+     * @param array<string, mixed> $data Сырые данные обновления
+     * @return IncomingMessage Входящее сообщение типа Action
+     */
     private function parseCallbackQuery(array $data): IncomingMessage
     {
         $cq = $data['callback_query'];
@@ -74,6 +99,10 @@ class TelegramDriver implements MessengerDriver
         );
     }
 
+    /** Разобрать обычное сообщение (текст, медиа, контакт, локация, событие).
+     * @param array<string, mixed> $data Сырые данные обновления
+     * @return IncomingMessage Входящее сообщение соответствующего типа
+     */
     private function parseMessage(array $data): IncomingMessage
     {
         $message = $data['message'];
@@ -151,6 +180,10 @@ class TelegramDriver implements MessengerDriver
         );
     }
 
+    /** Разобрать данные пользователя в DTO.
+     * @param array<string, mixed> $from Сырые данные пользователя из Telegram
+     * @return UserDto Объект данных пользователя
+     */
     private function parseUser(array $from): UserDto
     {
         return new UserDto(
@@ -163,8 +196,9 @@ class TelegramDriver implements MessengerDriver
         );
     }
 
-    /**
-     * @return array{string, array<string, string>}
+    /** Разобрать строку callback_data в действие и параметры.
+     * @param string $data Строка callback_data (формат: act:action;key:value)
+     * @return array{string, array<string, string>} Массив из действия и параметров
      */
     private function parseCallbackData(string $data): array
     {
@@ -186,6 +220,10 @@ class TelegramDriver implements MessengerDriver
         return [$action, $params];
     }
 
+    /** Определить тип медиа в сообщении.
+     * @param array<string, mixed> $message Данные сообщения
+     * @return string|null Тип медиа или null, если медиа нет
+     */
     private function detectMediaType(array $message): ?string
     {
         $types = ['photo', 'video', 'voice', 'audio', 'document', 'sticker', 'video_note', 'animation'];
@@ -199,6 +237,11 @@ class TelegramDriver implements MessengerDriver
         return null;
     }
 
+    /** Разобрать медиа-данные из сообщения в DTO.
+     * @param array<string, mixed> $message Данные сообщения
+     * @param string $type Тип медиа
+     * @return MediaDto Объект данных медиа
+     */
     private function parseMedia(array $message, string $type): MediaDto
     {
         if ($type === 'photo') {
@@ -222,6 +265,11 @@ class TelegramDriver implements MessengerDriver
         );
     }
 
+    /** Отправить исходящее сообщение пользователю.
+     * @param OutgoingMessage $message Исходящее сообщение для отправки
+     * @return void
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
     public function send(OutgoingMessage $message): void
     {
         if ($message->media !== null) {
@@ -245,6 +293,12 @@ class TelegramDriver implements MessengerDriver
         $this->apiCall('sendMessage', $payload);
     }
 
+    /** Редактировать ранее отправленное сообщение.
+     * @param string $messageId Идентификатор сообщения для редактирования
+     * @param OutgoingMessage $message Новое содержимое сообщения
+     * @return void
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
     public function edit(string $messageId, OutgoingMessage $message): void
     {
         $payload = [
@@ -264,6 +318,12 @@ class TelegramDriver implements MessengerDriver
         $this->apiCall('editMessageText', $payload);
     }
 
+    /** Удалить сообщение из чата.
+     * @param string $messageId Идентификатор сообщения
+     * @param string $chatId Идентификатор чата
+     * @return void
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
     public function delete(string $messageId, string $chatId): void
     {
         $this->apiCall('deleteMessage', [
@@ -272,6 +332,11 @@ class TelegramDriver implements MessengerDriver
         ]);
     }
 
+    /** Отправить медиа-сообщение (фото, видео, документ и др.).
+     * @param OutgoingMessage $message Исходящее сообщение с медиа
+     * @return void
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
     private function sendMedia(OutgoingMessage $message): void
     {
         $media = $message->media;
@@ -305,6 +370,10 @@ class TelegramDriver implements MessengerDriver
         $this->apiCall($method, $payload);
     }
 
+    /** Построить разметку клавиатуры для Telegram API.
+     * @param array<string, mixed> $keyboard Данные клавиатуры
+     * @return array<string, mixed> Разметка клавиатуры для reply_markup
+     */
     private function buildKeyboardMarkup(array $keyboard): array
     {
         if ($keyboard['remove']) {
@@ -327,6 +396,11 @@ class TelegramDriver implements MessengerDriver
         return ['inline_keyboard' => $rows];
     }
 
+    /** Построить данные одной кнопки для Telegram API.
+     * @param array<string, mixed> $btn Данные кнопки
+     * @param string $keyboardType Тип клавиатуры (reply/inline)
+     * @return array<string, mixed> Данные кнопки для API
+     */
     private function buildButton(array $btn, string $keyboardType): array
     {
         $result = ['text' => $btn['text']];
@@ -351,6 +425,11 @@ class TelegramDriver implements MessengerDriver
         return $result;
     }
 
+    /** Построить строку callback_data из действия и параметров.
+     * @param string $action Имя действия
+     * @param array<string, string> $params Параметры действия
+     * @return string Сериализованная строка callback_data
+     */
     private function buildCallbackData(string $action, array $params): string
     {
         $parts = ['act:' . $action];
@@ -360,6 +439,12 @@ class TelegramDriver implements MessengerDriver
         return implode(';', $parts);
     }
 
+    /** Выполнить вызов Telegram Bot API.
+     * @param string $method Метод API (например, sendMessage)
+     * @param array<string, mixed> $payload Данные запроса
+     * @return array<string, mixed> Ответ API
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
     private function apiCall(string $method, array $payload): array
     {
         $response = $this->client->request('POST', $this->apiUrl($method), [
@@ -369,6 +454,11 @@ class TelegramDriver implements MessengerDriver
         return json_decode($response->getBody()->getContents(), true) ?? [];
     }
 
+    /** Установить вебхук для получения обновлений.
+     * @param string $url URL-адрес для установки вебхука
+     * @return bool Успешность установки
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
     public function installWebhook(string $url): bool
     {
         $payload = ['url' => $url];
@@ -382,6 +472,10 @@ class TelegramDriver implements MessengerDriver
         return ($result['ok'] ?? false) === true;
     }
 
+    /** Удалить установленный вебхук.
+     * @return bool Успешность удаления
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
     public function removeWebhook(): bool
     {
         $result = $this->apiCall('deleteWebhook', []);
@@ -389,6 +483,11 @@ class TelegramDriver implements MessengerDriver
         return ($result['ok'] ?? false) === true;
     }
 
+    /** Получить информацию о пользователе по идентификатору.
+     * @param string $id Идентификатор пользователя
+     * @return UserDto Данные пользователя
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
     public function getUser(string $id): UserDto
     {
         $result = $this->apiCall('getChat', ['chat_id' => $id]);
@@ -404,6 +503,10 @@ class TelegramDriver implements MessengerDriver
         );
     }
 
+    /** Сформировать полный URL метода Telegram Bot API.
+     * @param string $method Метод API
+     * @return string Полный URL
+     */
     protected function apiUrl(string $method): string
     {
         return "https://api.telegram.org/bot{$this->token}/{$method}";

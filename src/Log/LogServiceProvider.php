@@ -2,15 +2,22 @@
 
 namespace Govorun\Log;
 
-use Govorun\Foundation\ServiceProvider;
-use Monolog\Handler\RotatingFileHandler;
-use Monolog\Handler\StreamHandler;
 use Monolog\Level;
 use Monolog\Logger;
 use Psr\Log\LoggerInterface;
+use Monolog\Handler\StreamHandler;
+use Govorun\Foundation\ServiceProvider;
+use Monolog\Handler\RotatingFileHandler;
 
+/** Сервис-провайдер логирования.
+ * Регистрирует PSR-3 логгер в контейнере с поддержкой каналов:
+ * single (один файл), daily (ротация по дням), stack (объединение каналов).
+ */
 class LogServiceProvider extends ServiceProvider
 {
+    /** Зарегистрировать логгер в контейнере.
+     * @return void
+     */
     public function register(): void
     {
         $this->app->singleton('log', function () {
@@ -20,6 +27,10 @@ class LogServiceProvider extends ServiceProvider
         $this->app->alias('log', LoggerInterface::class);
     }
 
+    /** Создать экземпляр логгера на основе конфигурации.
+     * @return LoggerInterface Настроенный экземпляр логгера
+     * @throws \RuntimeException При обнаружении циклической зависимости каналов
+     */
     private function createLogger(): LoggerInterface
     {
         $config = $this->app->make('config');
@@ -30,6 +41,14 @@ class LogServiceProvider extends ServiceProvider
         return $this->resolveChannel($defaultChannel, $channelConfig, $channels);
     }
 
+    /** Разрешить канал логирования по имени и конфигурации.
+     * @param string $name Имя канала
+     * @param array<string, mixed> $config Конфигурация канала
+     * @param array<string, array<string, mixed>> $allChannels Все доступные каналы
+     * @param array<string, bool> &$resolved Уже разрешённые каналы (защита от циклов)
+     * @return Logger Экземпляр Monolog-логгера
+     * @throws \RuntimeException При обнаружении циклической зависимости каналов
+     */
     private function resolveChannel(string $name, array $config, array $allChannels, array &$resolved = []): Logger
     {
         if (isset($resolved[$name])) {
@@ -47,6 +66,11 @@ class LogServiceProvider extends ServiceProvider
         };
     }
 
+    /** Создать канал с записью в один файл.
+     * @param string $name Имя канала
+     * @param array<string, mixed> $config Конфигурация канала
+     * @return Logger Экземпляр логгера
+     */
     private function createSingleChannel(string $name, array $config): Logger
     {
         $logger = new Logger($name);
@@ -58,6 +82,11 @@ class LogServiceProvider extends ServiceProvider
         return $logger;
     }
 
+    /** Создать канал с ежедневной ротацией файлов.
+     * @param string $name Имя канала
+     * @param array<string, mixed> $config Конфигурация канала
+     * @return Logger Экземпляр логгера
+     */
     private function createDailyChannel(string $name, array $config): Logger
     {
         $logger = new Logger($name);
@@ -70,6 +99,14 @@ class LogServiceProvider extends ServiceProvider
         return $logger;
     }
 
+    /** Создать составной канал (стек), объединяющий несколько каналов.
+     * @param string $name Имя канала
+     * @param array<string, mixed> $config Конфигурация канала
+     * @param array<string, array<string, mixed>> $allChannels Все доступные каналы
+     * @param array<string, bool> &$resolved Уже разрешённые каналы (защита от циклов)
+     * @return Logger Экземпляр логгера с объединёнными обработчиками
+     * @throws \RuntimeException При обнаружении циклической зависимости каналов
+     */
     private function createStackChannel(string $name, array $config, array $allChannels, array &$resolved = []): Logger
     {
         $logger = new Logger($name);
@@ -87,6 +124,10 @@ class LogServiceProvider extends ServiceProvider
         return $logger;
     }
 
+    /** Разобрать строковое имя уровня логирования в enum.
+     * @param string $level Строковое имя уровня (debug, info и т.д.)
+     * @return Level Уровень логирования Monolog
+     */
     private function parseLevel(string $level): Level
     {
         return Level::fromName($level);

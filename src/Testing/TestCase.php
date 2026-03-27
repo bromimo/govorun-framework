@@ -2,16 +2,23 @@
 
 namespace Govorun\Testing;
 
-use Govorun\Foundation\Application;
 use Govorun\Routing\Route;
+use Govorun\Foundation\Application;
 use PHPUnit\Framework\TestCase as PHPUnitTestCase;
 
+/** Базовый TestCase для тестирования Govorun-ботов.
+ * Создаёт Application в setUp(), подключает трейты для fakeMessenger() и fakeApi().
+ */
 abstract class TestCase extends PHPUnitTestCase
 {
     use InteractsWithMessenger, InteractsWithApi;
 
+    /** @var Application */
     protected Application $app;
 
+    /** Инициализация тестового окружения.
+     * @return void
+     */
     protected function setUp(): void
     {
         parent::setUp();
@@ -19,6 +26,9 @@ abstract class TestCase extends PHPUnitTestCase
         $this->app = $this->createApplication();
     }
 
+    /** Очистка после теста.
+     * @return void
+     */
     protected function tearDown(): void
     {
         Route::clear();
@@ -26,6 +36,9 @@ abstract class TestCase extends PHPUnitTestCase
         parent::tearDown();
     }
 
+    /** Создаёт и настраивает экземпляр Application.
+     * @return Application
+     */
     protected function createApplication(): Application
     {
         $app = new Application($this->basePath());
@@ -36,6 +49,9 @@ abstract class TestCase extends PHPUnitTestCase
         return $app;
     }
 
+    /** Определяет базовый путь проекта.
+     * @return string
+     */
     protected function basePath(): string
     {
         return defined('GOVORUN_BASE_PATH')

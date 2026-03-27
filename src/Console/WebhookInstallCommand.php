@@ -4,11 +4,17 @@ namespace Govorun\Console;
 
 use Illuminate\Console\Command;
 
+/** Команда установки вебхуков для активных мессенджер-драйверов.
+ * Перебирает настроенные драйверы и регистрирует вебхук-URL для каждого.
+ */
 class WebhookInstallCommand extends Command
 {
     protected $signature = 'webhook:install';
     protected $description = 'Install webhooks for active messenger drivers';
 
+    /** Установить вебхуки для всех настроенных мессенджер-драйверов.
+     * @return int
+     */
     public function handle(): int
     {
         $config = app('config');
@@ -41,6 +47,10 @@ class WebhookInstallCommand extends Command
         return self::SUCCESS;
     }
 
+    /** Разрешить экземпляр драйвера мессенджера по имени.
+     * @param string $name Имя драйвера
+     * @return \Govorun\Contracts\MessengerDriver
+     */
     private function resolveDriver(string $name): \Govorun\Contracts\MessengerDriver
     {
         $app = app();

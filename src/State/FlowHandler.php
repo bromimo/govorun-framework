@@ -2,20 +2,31 @@
 
 namespace Govorun\State;
 
-use Govorun\Contracts\MessengerDriver;
 use Govorun\Contracts\StateStorage;
+use Govorun\Contracts\MessengerDriver;
 use Govorun\Messaging\IncomingMessage;
 
+/** Обработчик активных диалоговых потоков.
+ * Проверяет наличие активного Flow для чата и при необходимости
+ * возобновляет или прерывает его.
+ */
 class FlowHandler
 {
+    /** Создать экземпляр обработчика потоков.
+     * @param StateStorage $storage Хранилище состояния
+     * @param MessengerDriver $driver Драйвер мессенджера
+     */
     public function __construct(
         private StateStorage $storage,
         private MessengerDriver $driver,
     ) {}
 
-    /**
-     * Returns true if Flow consumed the message (router should NOT dispatch).
-     * Returns false if no active Flow or Flow was interrupted (router should dispatch).
+    /** Обработать входящее сообщение в контексте активного потока.
+     * Возвращает true, если Flow обработал сообщение (роутер НЕ должен диспатчить).
+     * Возвращает false, если нет активного Flow или он был прерван (роутер должен диспатчить).
+     * @param IncomingMessage $message Входящее сообщение
+     * @return bool
+     * @throws \Throwable При ошибках хранилища или драйвера
      */
     public function handle(IncomingMessage $message): bool
     {

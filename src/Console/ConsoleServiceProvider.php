@@ -5,8 +5,14 @@ namespace Govorun\Console;
 use Govorun\Foundation\ServiceProvider;
 use Illuminate\Console\Application as Artisan;
 
+/** Провайдер консольных команд фреймворка.
+ * Регистрирует Artisan-приложение и загружает все встроенные команды.
+ */
 class ConsoleServiceProvider extends ServiceProvider
 {
+    /** Регистрация Artisan-приложения в контейнере.
+     * @return void
+     */
     public function register(): void
     {
         $this->app->singleton('artisan', function () {
@@ -21,6 +27,9 @@ class ConsoleServiceProvider extends ServiceProvider
         });
     }
 
+    /** Загрузка и регистрация всех встроенных консольных команд.
+     * @return void
+     */
     public function boot(): void
     {
         $artisan = $this->app->make('artisan');

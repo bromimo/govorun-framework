@@ -2,47 +2,82 @@
 
 namespace Govorun\Testing;
 
-use Govorun\Http\ApiClient;
 use GuzzleHttp\Client;
-use GuzzleHttp\Handler\MockHandler;
-use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
+use Govorun\Http\ApiClient;
+use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Response;
 use PHPUnit\Framework\Assert;
+use GuzzleHttp\Handler\MockHandler;
 
+/** Обёртка над ApiClient для мокирования HTTP-запросов в тестах.
+ * Через рефлексию подменяет Guzzle-клиент внутри реального ApiClient
+ * на MockHandler, позволяя регистрировать заготовленные ответы и проверять вызовы.
+ */
 class FakeApiClient
 {
+    /** @var MockHandler */
     private MockHandler $mockHandler;
+
+    /** @var array<int, array{request: \Psr\Http\Message\RequestInterface, response: \Psr\Http\Message\ResponseInterface}> История запросов */
     private array $history = [];
 
-    /** @var array<string, mixed> method+uri => response body */
+    /** @var array<string, mixed> Зарегистрированные моки (method+uri => response body) */
     private array $mocks = [];
 
+    /** Создать экземпляр FakeApiClient.
+     * @param ApiClient $realClient Оригинальный экземпляр ApiClient
+     */
     public function __construct(private ApiClient $realClient)
     {
         $this->installHandler();
     }
 
+    /** Регистрирует мок-ответ для GET-запроса.
+     * @param string $uri      URI запроса
+     * @param mixed  $response Тело ответа
+     * @return static
+     */
     public function mockGet(string $uri, mixed $response): static
     {
         return $this->mock('GET', $uri, $response);
     }
 
+    /** Регистрирует мок-ответ для POST-запроса.
+     * @param string $uri      URI запроса
+     * @param mixed  $response Тело ответа
+     * @return static
+     */
     public function mockPost(string $uri, mixed $response): static
     {
         return $this->mock('POST', $uri, $response);
     }
 
+    /** Регистрирует мок-ответ для PUT-запроса.
+     * @param string $uri      URI запроса
+     * @param mixed  $response Тело ответа
+     * @return static
+     */
     public function mockPut(string $uri, mixed $response): static
     {
         return $this->mock('PUT', $uri, $response);
     }
 
+    /** Регистрирует мок-ответ для DELETE-запроса.
+     * @param string $uri      URI запроса
+     * @param mixed  $response Тело ответа
+     * @return static
+     */
     public function mockDelete(string $uri, mixed $response): static
     {
         return $this->mock('DELETE', $uri, $response);
     }
 
+    /** Проверяет, что запрос с указанным методом и URI был выполнен.
+     * @param string $method HTTP-метод (GET, POST, PUT, DELETE)
+     * @param string $uri    URI запроса
+     * @return static
+     */
     public function assertRequestMade(string $method, string $uri): static
     {
         $normalizedUri = '/' . ltrim($uri, '/');
@@ -61,6 +96,10 @@ class FakeApiClient
         return $this;
     }
 
+    /** Проверяет общее количество выполненных запросов.
+     * @param int $expected Ожидаемое количество
+     * @return static
+     */
     public function assertRequestCount(int $expected): static
     {
         Assert::assertCount(
@@ -72,6 +111,12 @@ class FakeApiClient
         return $this;
     }
 
+    /** Регистрирует мок-ответ для указанного метода и URI.
+     * @param string $method   HTTP-метод
+     * @param string $uri      URI запроса
+     * @param mixed  $response Тело ответа
+     * @return static
+     */
     private function mock(string $method, string $uri, mixed $response): static
     {
         $key = $method . ' ' . '/' . ltrim($uri, '/');
@@ -81,6 +126,9 @@ class FakeApiClient
         return $this;
     }
 
+    /** Устанавливает мок-обработчик в реальный ApiClient через рефлексию.
+     * @return void
+     */
     private function installHandler(): void
     {
         $mocks = &$this->mocks;

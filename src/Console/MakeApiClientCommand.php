@@ -4,11 +4,17 @@ namespace Govorun\Console;
 
 use Illuminate\Console\Command;
 
+/** Команда создания нового класса API-клиента.
+ * Генерирует файл API-клиента из шаблона (stub) в директории app/Services.
+ */
 class MakeApiClientCommand extends Command
 {
     protected $signature = 'make:api-client {name : The name of the API client}';
     protected $description = 'Create a new API client class';
 
+    /** Создать новый файл API-клиента из шаблона.
+     * @return int
+     */
     public function handle(): int
     {
         $name = $this->argument('name');

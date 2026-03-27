@@ -4,11 +4,17 @@ namespace Govorun\Console;
 
 use Illuminate\Console\Command;
 
+/** Команда создания нового класса Flow (диалогового потока).
+ * Генерирует файл Flow из шаблона (stub) в директории app/Flows.
+ */
 class MakeFlowCommand extends Command
 {
     protected $signature = 'make:flow {name : The name of the flow}';
     protected $description = 'Create a new Flow class';
 
+    /** Создать новый файл Flow из шаблона.
+     * @return int
+     */
     public function handle(): int
     {
         $name = $this->argument('name');

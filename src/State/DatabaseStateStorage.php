@@ -5,13 +5,27 @@ namespace Govorun\State;
 use Govorun\Contracts\StateStorage;
 use Illuminate\Database\ConnectionInterface;
 
+/** Хранилище состояния потоков на основе базы данных.
+ * Сохраняет и извлекает состояние Flow через Illuminate Database,
+ * используя таблицу govorun_states.
+ */
 class DatabaseStateStorage implements StateStorage
 {
+    /** Создать экземпляр хранилища на основе БД.
+     * @param ConnectionInterface $connection Соединение с базой данных
+     * @param string $table Имя таблицы для хранения состояний
+     */
     public function __construct(
         private ConnectionInterface $connection,
         private string $table = 'govorun_states',
     ) {}
 
+    /** Получить состояние по идентификатору чата и драйверу.
+     * @param string $chatId Идентификатор чата
+     * @param string $driver Имя драйвера мессенджера
+     * @return array|null
+     * @throws \Illuminate\Database\QueryException
+     */
     public function get(string $chatId, string $driver): ?array
     {
         $row = $this->connection->table($this->table)
@@ -30,6 +44,14 @@ class DatabaseStateStorage implements StateStorage
         ];
     }
 
+    /** Сохранить состояние для чата и драйвера.
+     * Выполняет вставку новой записи или обновление существующей.
+     * @param string $chatId Идентификатор чата
+     * @param string $driver Имя драйвера мессенджера
+     * @param array $data Данные состояния
+     * @return void
+     * @throws \Illuminate\Database\QueryException
+     */
     public function set(string $chatId, string $driver, array $data): void
     {
         $row = [
@@ -57,6 +79,12 @@ class DatabaseStateStorage implements StateStorage
         }
     }
 
+    /** Удалить состояние для чата и драйвера.
+     * @param string $chatId Идентификатор чата
+     * @param string $driver Имя драйвера мессенджера
+     * @return void
+     * @throws \Illuminate\Database\QueryException
+     */
     public function delete(string $chatId, string $driver): void
     {
         $this->connection->table($this->table)

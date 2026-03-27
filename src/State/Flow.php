@@ -2,12 +2,17 @@
 
 namespace Govorun\State;
 
-use Govorun\Contracts\MessengerDriver;
-use Govorun\Contracts\StateStorage;
-use Govorun\Messaging\ContentType;
-use Govorun\Messaging\IncomingMessage;
 use Govorun\Messaging\Message;
+use Govorun\Messaging\ContentType;
+use Govorun\Contracts\StateStorage;
+use Govorun\Contracts\MessengerDriver;
+use Govorun\Messaging\IncomingMessage;
 
+/** Абстрактный диалоговый поток (Flow).
+ * Базовый класс для пошаговых диалогов с пользователем.
+ * Управляет переходами между шагами, хранением состояния,
+ * прерыванием по командам и событиям.
+ */
 abstract class Flow
 {
     protected array $steps = [];
@@ -18,6 +23,11 @@ abstract class Flow
     private string $chatId;
     private string $driverName;
 
+    /** Создать экземпляр потока.
+     * @param StateStorage $storage Хранилище состояния
+     * @param MessengerDriver $driver Драйвер мессенджера
+     * @param IncomingMessage $message Входящее сообщение
+     */
     public function __construct(
         protected StateStorage $storage,
         protected MessengerDriver $driver,
@@ -28,6 +38,10 @@ abstract class Flow
         $this->state = new StateData($this->loadData());
     }
 
+    /** Запустить поток с первого шага.
+     * @return void
+     * @throws \Throwable При ошибках хранилища или драйвера
+     */
     public function start(): void
     {
         $firstStep = $this->steps[0] ?? null;
@@ -40,6 +54,11 @@ abstract class Flow
         $this->executeAsk($firstStep);
     }
 
+    /** Возобновить поток с текущего шага.
+     * Загружает сохранённое состояние и вызывает receive-коллбэк текущего шага.
+     * @return void
+     * @throws \Throwable При ошибках хранилища или драйвера
+     */
     public function resume(): void
     {
         $stateRecord = $this->storage->get($this->chatId, $this->driverName);
@@ -67,6 +86,10 @@ abstract class Flow
         }
     }
 
+    /** Проверить, должен ли поток быть прерван входящим сообщением.
+     * @param IncomingMessage $message Входящее сообщение
+     * @return bool
+     */
     public function shouldInterrupt(IncomingMessage $message): bool
     {
         if ($this->interruptOnEvent && $message->type === ContentType::Event) {
@@ -88,6 +111,11 @@ abstract class Flow
         return false;
     }
 
+    /** Перейти к следующему шагу потока.
+     * Если текущий шаг последний — завершает поток и вызывает onComplete.
+     * @return void
+     * @throws \Throwable При ошибках хранилища или драйвера
+     */
     protected function nextStep(): void
     {
         $stateRecord = $this->storage->get($this->chatId, $this->driverName);
@@ -106,6 +134,11 @@ abstract class Flow
         $this->executeAsk($nextStep);
     }
 
+    /** Отправить текстовый ответ пользователю.
+     * @param string $text Текст сообщения
+     * @return void
+     * @throws \Throwable При ошибке отправки через драйвер
+     */
     protected function reply(string $text): void
     {
         $msg = Message::make($text);
@@ -113,13 +146,26 @@ abstract class Flow
         $this->driver->send($msg);
     }
 
+    /** Обработчик завершения потока.
+     * @return void
+     */
     public function onComplete(): void {}
 
+    /** Обработчик отмены потока.
+     * Удаляет состояние из хранилища.
+     * @return void
+     * @throws \Throwable При ошибке хранилища
+     */
     public function onCancel(): void
     {
         $this->storage->delete($this->chatId, $this->driverName);
     }
 
+    /** Выполнить ask-фазу указанного шага.
+     * @param string $stepName Имя шага
+     * @return void
+     * @throws \Throwable При ошибке отправки через драйвер
+     */
     private function executeAsk(string $stepName): void
     {
         $step = new Step();
@@ -147,6 +193,11 @@ abstract class Flow
         }
     }
 
+    /** Сохранить текущее состояние потока в хранилище.
+     * @param string $currentStep Имя текущего шага
+     * @return void
+     * @throws \Throwable При ошибке хранилища
+     */
     private function saveState(string $currentStep): void
     {
         $this->storage->set($this->chatId, $this->driverName, [
@@ -156,6 +207,10 @@ abstract class Flow
         ]);
     }
 
+    /** Загрузить данные состояния из хранилища.
+     * @return array
+     * @throws \Throwable При ошибке хранилища
+     */
     private function loadData(): array
     {
         $stateRecord = $this->storage->get($this->chatId, $this->driverName);
@@ -164,25 +219,48 @@ abstract class Flow
     }
 }
 
+/** Контейнер данных состояния потока.
+ * Хранит произвольные данные, собранные в процессе прохождения шагов Flow.
+ */
 class StateData
 {
+    /** Создать экземпляр контейнера данных.
+     * @param array $data Начальные данные
+     */
     public function __construct(private array $data = []) {}
 
+    /** Получить значение по ключу.
+     * @param string $key Ключ
+     * @param mixed $default Значение по умолчанию
+     * @return mixed
+     */
     public function get(string $key, mixed $default = null): mixed
     {
         return $this->data[$key] ?? $default;
     }
 
+    /** Установить значение по ключу.
+     * @param string $key Ключ
+     * @param mixed $value Значение
+     * @return void
+     */
     public function set(string $key, mixed $value): void
     {
         $this->data[$key] = $value;
     }
 
+    /** Проверить наличие ключа в данных.
+     * @param string $key Ключ
+     * @return bool
+     */
     public function has(string $key): bool
     {
         return array_key_exists($key, $this->data);
     }
 
+    /** Получить все данные.
+     * @return array
+     */
     public function all(): array
     {
         return $this->data;

@@ -2,20 +2,32 @@
 
 namespace Govorun\Routing;
 
-use Govorun\Contracts\MessengerDriver;
 use Govorun\Messaging\ContentType;
+use Govorun\Contracts\MessengerDriver;
 use Govorun\Messaging\IncomingMessage;
 
+/** Маршрутизатор входящих сообщений.
+ * Сопоставляет входящее сообщение с зарегистрированными маршрутами
+ * по приоритету типов и вызывает соответствующий обработчик,
+ * пропуская его через цепочку middleware.
+ */
 class Router
 {
     private MiddlewarePipeline $pipeline;
 
+    /** Создать экземпляр маршрутизатора.
+     * @param MessengerDriver $driver Драйвер мессенджера
+     */
     public function __construct(
         private MessengerDriver $driver,
     ) {
         $this->pipeline = new MiddlewarePipeline();
     }
 
+    /** Диспетчеризовать входящее сообщение: найти подходящий маршрут и выполнить его.
+     * @param IncomingMessage $message Входящее сообщение
+     * @return void
+     */
     public function dispatch(IncomingMessage $message): void
     {
         $routes = Route::getRoutes();
@@ -32,7 +44,9 @@ class Router
         });
     }
 
-    /**
+    /** Найти подходящий маршрут среди списка по приоритету типов.
+     * @param IncomingMessage $message Входящее сообщение
+     * @param array $routes Массив маршрутов для поиска
      * @return array{RouteEntry, string[]}|null
      */
     private function matchRoute(IncomingMessage $message, array $routes): ?array
@@ -54,7 +68,9 @@ class Router
         return null;
     }
 
-    /**
+    /** Проверить, совпадает ли конкретный маршрут с сообщением.
+     * @param IncomingMessage $message Входящее сообщение
+     * @param RouteEntry $entry Запись маршрута для проверки
      * @return array{RouteEntry, string[]}|null
      */
     private function matchEntry(IncomingMessage $message, RouteEntry $entry): ?array
@@ -93,6 +109,11 @@ class Router
         return null;
     }
 
+    /** Проверить совпадение текста сообщения с командой.
+     * @param IncomingMessage $message Входящее сообщение
+     * @param RouteEntry $entry Запись маршрута команды
+     * @return bool
+     */
     private function matchCommand(IncomingMessage $message, RouteEntry $entry): bool
     {
         if ($message->text === null) {
@@ -103,6 +124,11 @@ class Router
         return $text === $command || str_starts_with($text, $command . ' ');
     }
 
+    /** Проверить совпадение текста сообщения с фразой или её алиасами.
+     * @param IncomingMessage $message Входящее сообщение
+     * @param RouteEntry $entry Запись маршрута фразы
+     * @return bool
+     */
     private function phraseTextMatches(IncomingMessage $message, RouteEntry $entry): bool
     {
         if ($message->text === null) {
@@ -120,6 +146,11 @@ class Router
         return false;
     }
 
+    /** Вызвать обработчик маршрута (контроллер или массив [класс, метод]).
+     * @param mixed $action Обработчик маршрута
+     * @param IncomingMessage $message Входящее сообщение
+     * @return void
+     */
     private function callAction(mixed $action, IncomingMessage $message): void
     {
         if (is_string($action)) {

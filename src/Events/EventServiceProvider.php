@@ -2,11 +2,18 @@
 
 namespace Govorun\Events;
 
-use Govorun\Foundation\ServiceProvider;
 use Illuminate\Events\Dispatcher;
+use Govorun\Foundation\ServiceProvider;
 
+/** Сервис-провайдер событий.
+ * Регистрирует диспетчер событий в контейнере и привязывает
+ * слушатели из конфигурации при загрузке приложения.
+ */
 class EventServiceProvider extends ServiceProvider
 {
+    /** Зарегистрировать диспетчер событий в контейнере.
+     * @return void
+     */
     public function register(): void
     {
         $this->app->singleton('events', function () {
@@ -14,6 +21,9 @@ class EventServiceProvider extends ServiceProvider
         });
     }
 
+    /** Привязать слушатели событий из конфигурации.
+     * @return void
+     */
     public function boot(): void
     {
         $events = $this->app->make('events');

@@ -4,11 +4,17 @@ namespace Govorun\Console;
 
 use Illuminate\Console\Command;
 
+/** Команда очистки состояний диалогов (Flow).
+ * Поддерживает очистку для драйверов file, database и cache.
+ */
 class StateClearCommand extends Command
 {
     protected $signature = 'state:clear';
     protected $description = 'Clear all Flow dialog states';
 
+    /** Очистить все сохранённые состояния диалогов.
+     * @return int
+     */
     public function handle(): int
     {
         $driver = app('config')->get('state.driver', 'file');
@@ -21,6 +27,9 @@ class StateClearCommand extends Command
         };
     }
 
+    /** Очистить файловое хранилище состояний.
+     * @return int
+     */
     private function clearFileStorage(): int
     {
         $path = app()->storagePath('state');
@@ -41,6 +50,9 @@ class StateClearCommand extends Command
         return self::SUCCESS;
     }
 
+    /** Очистить состояния из базы данных.
+     * @return int
+     */
     private function clearDatabaseStorage(): int
     {
         $connection = app('db');
@@ -51,6 +63,9 @@ class StateClearCommand extends Command
         return self::SUCCESS;
     }
 
+    /** Вывести предупреждение о невозможности селективной очистки кеша.
+     * @return int
+     */
     private function clearCacheStorage(): int
     {
         $this->warn('Cache-based state storage cannot be selectively cleared.');

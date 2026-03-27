@@ -3,13 +3,18 @@
 namespace Govorun\Console;
 
 use Illuminate\Console\Command;
-use Illuminate\Database\Schema\Builder as SchemaBuilder;
 
+/** Команда запуска миграций базы данных.
+ * Сканирует директорию миграций фреймворка и выполняет метод up() каждой миграции.
+ */
 class MigrateCommand extends Command
 {
     protected $signature = 'migrate';
     protected $description = 'Run framework database migrations';
 
+    /** Выполнить миграции базы данных.
+     * @return int
+     */
     public function handle(): int
     {
         $connection = app('db');
@@ -44,6 +49,10 @@ class MigrateCommand extends Command
         return self::SUCCESS;
     }
 
+    /** Определить полное имя класса миграции по пути к файлу.
+     * @param string $file Путь к файлу миграции
+     * @return string|null
+     */
     private function resolveClassName(string $file): ?string
     {
         $basename = basename($file, '.php');

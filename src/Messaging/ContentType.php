@@ -2,6 +2,7 @@
 
 namespace Govorun\Messaging;
 
+/** Перечисление типов контента входящего сообщения. */
 enum ContentType: string
 {
     case Text = 'text';

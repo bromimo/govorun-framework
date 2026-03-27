@@ -4,11 +4,17 @@ namespace Govorun\Console;
 
 use Illuminate\Console\Command;
 
+/** Команда создания нового класса контроллера.
+ * Генерирует файл контроллера из шаблона (stub) в директории app/Controllers.
+ */
 class MakeControllerCommand extends Command
 {
     protected $signature = 'make:controller {name : The name of the controller}';
     protected $description = 'Create a new controller class';
 
+    /** Создать новый файл контроллера из шаблона.
+     * @return int
+     */
     public function handle(): int
     {
         $name = $this->argument('name');
