@@ -1,6 +1,6 @@
-# Govorun Framework
+# CLAUDE.md
 
-Multi-messenger bot framework for PHP 8.3. Architecture: core (`govorun/framework`) as Composer package.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Quick Reference
 
@@ -9,55 +9,76 @@ Multi-messenger bot framework for PHP 8.3. Architecture: core (`govorun/framewor
 - **Single test:** `vendor/bin/phpunit tests/Unit/Path/TestFile.php --filter=test_name`
 - **Autoload:** PSR-4 `Govorun\` -> `src/`, `Govorun\Tests\` -> `tests/`
 - **Design spec:** `docs/superpowers/specs/2026-03-25-govorun-design.md`
+- **Commits:** Conventional commits — `feat:`, `fix:`, `chore:`, `docs:`
 
 ## Architecture
 
+Multi-messenger bot framework. Core package `govorun/framework` built on illuminate components ^11.0.
+
+**Request lifecycle:** `Application::handleWebhook(Request)` → resolve driver → `verifyWebhook()` → `parseUpdate()` → `FlowHandler::handle()` (if active Flow exists) → `Router::dispatch()` → matched route action.
+
+**Key abstractions:**
+- `MessengerDriver` interface — platform adapters (Telegram implemented, Viber/WhatsApp planned)
+- `StateStorage` interface — session persistence (File/Database/Cache implementations)
+- `Route` static DSL — `Route::on()`, `Route::command()`, `Route::phrase()`, `Route::action()`, `Route::fallback()`
+- `Flow` — multi-step dialogs with `Step` definitions, auto-resume, interrupt detection
+- `Application` extends `Illuminate\Container\Container` — IoC, config, providers, webhook/console handling
+
 ```
 src/
-    Console/          # ConsoleServiceProvider, 8 commands (webhook:*, migrate, make:*, state:clear, test), stubs/
-    Contracts/        # Interfaces: MessengerDriver, StateStorage
+    Console/          # ConsoleServiceProvider, 8 commands, stubs/
+    Contracts/        # MessengerDriver, StateStorage
     Database/         # Migrations (CreateGovorunStatesTable)
-    Drivers/Telegram/ # TelegramDriver — first messenger implementation
-    Events/           # EventServiceProvider — Dispatcher registration, listener mapping from config
+    Drivers/Telegram/ # TelegramDriver
+    Events/           # EventServiceProvider
     Exceptions/       # SendFailedException, ApiException
-    Foundation/       # Application (extends Container), ServiceProvider
-    Http/             # Request wrapper, ApiClient base class
-    Log/              # LogServiceProvider (single/daily/stack channels), Log facade
+    Foundation/       # Application, ServiceProvider
+    Http/             # Request, ApiClient (abstract)
+    Log/              # LogServiceProvider, Log facade
     Messaging/        # IncomingMessage, OutgoingMessage, Message, Button, Keyboard, Media, DTOs
-    Routing/          # Route (static DSL), Router (priority dispatch), Controller, Middleware
+    Routing/          # Route, Router, Controller, Middleware, MiddlewarePipeline, RouteEntry
     State/            # Flow, Step, FlowHandler, File/Database/CacheStateStorage, StateServiceProvider
-    Support/          # helpers.php (app, config, env, event, base_path, etc.)
-    Testing/          # TestCase, FakeMessenger, FakeDriver, FakeApiClient, InteractsWithMessenger, InteractsWithApi
+    Support/          # helpers.php
+    Testing/          # TestCase, FakeMessenger, FakeDriver, FakeApiClient, traits
 ```
 
 ## Conventions
 
-- **Namespace:** `Govorun\` for source, `Govorun\Tests\` for tests
-- **Tests:** Mirror src structure under `tests/Unit/`. Test class naming: `{Class}Test.php`
-- **Test fixtures:** `tests/fixtures/config/` for config files
-- **Test tearDown:** Always call `Application::setInstance(null)` to prevent state leakage
-- **Dependencies:** illuminate components ^11.0 (container, config, support, events, database, cache, console, log)
-- **Helpers:** Global functions in `src/Support/helpers.php` — `app()`, `config()`, `env()`, `event()`, path helpers
-- **Log facade:** `Govorun\Log\Log::info()`, `Log::error()`, etc. — static access to PSR-3 logger
+### Code Style
+
+- **PHPDocs** — required on all classes, methods, properties. Format:
+  - Description on the **same line** as `/**`
+  - No blank lines inside PHPDoc
+  - Single-line PHPDocs close on same line: `/** Description. */`
+  - All tags required: `@param`, `@return`, `@throws`
+  - `@throws` required for **propagated exceptions** too (from called methods)
+  ```php
+  /** Description. */
+
+  /** Method description.
+   * @param string $name Name
+   * @return void
+   * @throws \RuntimeException If something goes wrong
+   */
+  ```
+- **use imports** — sorted by ascending line length (shortest first)
+
+### Testing
+
+- Mirror src structure under `tests/Unit/`. Naming: `{Class}Test.php`
+- Test fixtures in `tests/fixtures/config/`
+- **tearDown:** Always call `Application::setInstance(null)` to prevent state leakage
+- Database tests use SQLite in-memory via `Illuminate\Database\Capsule\Manager`
+- Windows: call `$this->app->flush()` and `gc_collect_cycles()` in tearDown before unlinking log files
+
+### Framework Patterns
+
 - **Service Providers:** Extend `Govorun\Foundation\ServiceProvider`, implement `register()` and `boot()`
-- **Core Providers:** `Application::registerCoreProviders()` registers EventServiceProvider + LogServiceProvider + StateServiceProvider
-- **State config:** `config/state.php` — `driver` (file/database/cache), `ttl` (seconds). StateServiceProvider resolves the right storage
-- **Database tests:** Use SQLite in-memory via `Illuminate\Database\Capsule\Manager`
-- **Windows tests:** Use `$this->app->flush()` and `gc_collect_cycles()` in tearDown before unlinking log files
-- **Commits:** Conventional commits — `feat:`, `fix:`, `chore:`, `docs:`
+- **Core Providers:** `Application::registerCoreProviders()` registers Event + Log + State providers
+- **State config:** `config/state.php` — `driver` (file/database/cache), `ttl` (seconds)
+- **Helpers:** `app()`, `config()`, `env()`, `event()`, `base_path()`, `config_path()`, `storage_path()`, `database_path()`
+- **Log facade:** `Govorun\Log\Log::info()`, `Log::error()`, etc.
 
 ## Implementation Status
 
-| Phase | Component | Status |
-|-------|-----------|--------|
-| 1 | Foundation (Container, Config, Helpers) | Done |
-| 2 | Messaging (Message, Button, Keyboard, Media) | Done |
-| 3 | Routing (Route, Router, Controller, Middleware) | Done |
-| 4 | Telegram Driver | Done |
-| 5 | HTTP Lifecycle (handleWebhook) | Done |
-| 6 | API Client | Done |
-| 7 | State Management (Flow, Step, FlowHandler, FileStateStorage) | Done |
-| 8 | Events & Logging | Done |
-| 9 | Database & State Storage (migration, DatabaseStateStorage, CacheStateStorage, StateServiceProvider) | Done |
-| 10 | Console Commands (webhook:install/remove, migrate, make:*, state:clear, test) | Done |
-| 11 | Testing Helpers (fakeMessenger, fakeApi) | Done |
+All 11 phases complete: Foundation, Messaging, Routing, Telegram Driver, HTTP Lifecycle, API Client, State Management, Events & Logging, Database & State Storage, Console Commands, Testing Helpers.
