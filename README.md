@@ -369,6 +369,8 @@ class OrderFlow extends Flow
 
         $step->receive(function (IncomingMessage $msg) {
             $this->reply('Заказ принят!');
+            // nextStep() обязателен — завершает flow и очищает состояние
+            $this->nextStep();
         });
     }
 
@@ -410,6 +412,8 @@ class OrderFlow extends Flow
 4. Flow вызывает `receive` callback текущего шага
 5. `$this->nextStep()` переходит к следующему шагу
 6. После последнего шага вызывается `onComplete()`
+
+**Важно:** `$this->nextStep()` обязателен в каждом `receive` callback. На последнем шаге он завершает flow и очищает состояние. Без него flow останется активным и будет перехватывать все последующие сообщения.
 
 ---
 
