@@ -138,6 +138,18 @@ class Application extends Container
         return $this->booted;
     }
 
+    /** Загрузить файл маршрутов routes/messenger.php.
+     * @return void
+     */
+    public function loadRoutes(): void
+    {
+        $routesFile = $this->basePath('routes/messenger.php');
+
+        if (file_exists($routesFile)) {
+            require $routesFile;
+        }
+    }
+
     /** Определить, запущено ли приложение в контексте unit-тестов.
      * @return bool
      */
@@ -224,6 +236,7 @@ class Application extends Container
         $this->registerCoreProviders();
         $this->registerConfiguredProviders();
         $this->boot();
+        $this->loadRoutes();
 
         $driverName = $this->resolveDriverName($request);
         $driver = $this->resolveDriver($driverName);
