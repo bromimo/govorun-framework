@@ -219,6 +219,12 @@ class Application extends Container
      */
     public function handleWebhook(Request $request): int
     {
+        $this->loadEnvironment();
+        $this->loadConfiguration();
+        $this->registerCoreProviders();
+        $this->registerConfiguredProviders();
+        $this->boot();
+
         $driverName = $this->resolveDriverName($request);
         $driver = $this->resolveDriver($driverName);
 
