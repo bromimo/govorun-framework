@@ -44,7 +44,7 @@ class TelegramDriver implements MessengerDriver
      */
     public function verifyWebhook(Request $request): bool
     {
-        if ($this->secret === null) {
+        if ($this->secret === null || $this->secret === '') {
             return true;
         }
 
