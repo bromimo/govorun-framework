@@ -162,6 +162,14 @@ class Validator
         return $this;
     }
 
+    /** Отключить автоматическую отправку ошибки. */
+    public function silent(): static
+    {
+        $this->errorHandler = null;
+
+        return $this;
+    }
+
     /** Проверить, провалена ли валидация. Вызывает errorHandler если установлен. */
     public function fails(): bool
     {
