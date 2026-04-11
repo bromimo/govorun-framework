@@ -37,6 +37,16 @@ class Validator
         return $this;
     }
 
+    /** Текстовое значение (не чисто числовое). */
+    public function string(string $message = 'Значение должно быть строкой'): static
+    {
+        if ($this->error === null && $this->value !== null && is_numeric($this->value)) {
+            $this->error = $message;
+        }
+
+        return $this;
+    }
+
     /** Числовое значение. */
     public function numeric(string $message = 'Значение должно быть числом'): static
     {
