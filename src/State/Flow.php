@@ -3,6 +3,7 @@
 namespace Govorun\State;
 
 use Govorun\Messaging\Message;
+use Govorun\Support\Validator;
 use Govorun\Messaging\ContentType;
 use Govorun\Contracts\StateStorage;
 use Govorun\Contracts\MessengerDriver;
@@ -144,6 +145,14 @@ abstract class Flow
         $msg = Message::make($text);
         $msg->chatId = $this->chatId;
         $this->driver->send($msg);
+    }
+
+    /** Создать валидатор с автоматической отправкой ошибки пользователю.
+     * @param ?string $value Проверяемое значение
+     */
+    protected function validator(?string $value): Validator
+    {
+        return Validator::make($value)->withErrorHandler(fn (string $error) => $this->reply($error));
     }
 
     /** Обработчик завершения потока.

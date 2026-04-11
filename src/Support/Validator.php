@@ -7,6 +7,8 @@ class Validator
 {
     private ?string $error = null;
 
+    private ?\Closure $errorHandler = null;
+
     private function __construct(private readonly ?string $value) {}
 
     /** Создать экземпляр валидатора.
@@ -148,6 +150,30 @@ class Validator
         }
 
         return $this;
+    }
+
+    /** Установить обработчик ошибки для fails().
+     * @param  \Closure  $handler  fn(string $error): void
+     */
+    public function withErrorHandler(\Closure $handler): static
+    {
+        $this->errorHandler = $handler;
+
+        return $this;
+    }
+
+    /** Проверить, провалена ли валидация. Вызывает errorHandler если установлен. */
+    public function fails(): bool
+    {
+        if ($this->error === null) {
+            return false;
+        }
+
+        if ($this->errorHandler !== null) {
+            ($this->errorHandler)($this->error);
+        }
+
+        return true;
     }
 
     /** Получить первую ошибку или null, если все проверки прошли. */
