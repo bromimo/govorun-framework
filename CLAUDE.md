@@ -42,6 +42,13 @@ src/
     Testing/          # TestCase, FakeMessenger, FakeDriver, FakeApiClient, traits
 ```
 
+## Validation messages
+
+Дефолтные тексты сообщений валидации — в `resources/validation-messages.json` (плоский `{ruleName: template}` объект с именованными плейсхолдерами `{value}`, `{min}`, `{max}`).
+`Support/Validator.php` lazy-читает файл при первом вызове.
+
+**Этот файл дублируется в `govorun-factory/resources/validation-messages.json`.** При любом изменении обновлять обе копии — одним коммитом, в обоих репо.
+
 ## Conventions
 
 ### Code Style
