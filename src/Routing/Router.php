@@ -119,7 +119,7 @@ class Router
         if ($message->text === null) {
             return false;
         }
-        $text = ltrim($message->text, '/');
+        $text = $message->text;
         $command = $entry->value;
         return $text === $command || str_starts_with($text, $command . ' ');
     }

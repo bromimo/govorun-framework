@@ -57,7 +57,7 @@ class RouterTest extends TestCase
         $ctrl::$called = false;
     }
 
-    public function test_dispatches_command_without_slash(): void
+    public function test_dispatches_command_registered_without_slash(): void
     {
         $ctrl = new class extends Controller {
             public static bool $called = false;
@@ -68,6 +68,31 @@ class RouterTest extends TestCase
         $router->dispatch($this->makeMessage('/help extra params'));
         $this->assertTrue($ctrl::$called);
         $ctrl::$called = false;
+    }
+
+    public function test_dispatches_command_registered_with_leading_slash(): void
+    {
+        $ctrl = new class extends Controller {
+            public static bool $called = false;
+            public function handle(): void { static::$called = true; }
+        };
+        Route::command('/start', [get_class($ctrl), 'handle']);
+        $router = new Router($this->driver);
+        $router->dispatch($this->makeMessage('/start'));
+        $this->assertTrue($ctrl::$called);
+        $ctrl::$called = false;
+    }
+
+    public function test_does_not_match_command_without_leading_slash_in_message(): void
+    {
+        $ctrl = new class extends Controller {
+            public static bool $called = false;
+            public function handle(): void { static::$called = true; }
+        };
+        Route::command('/start', [get_class($ctrl), 'handle']);
+        $router = new Router($this->driver);
+        $router->dispatch($this->makeMessage('start'));
+        $this->assertFalse($ctrl::$called);
     }
 
     public function test_dispatches_action(): void
