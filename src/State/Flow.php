@@ -113,26 +113,48 @@ abstract class Flow
     }
 
     /** Перейти к следующему шагу потока.
-     * Если текущий шаг последний — завершает поток и вызывает onComplete.
+     * Если передано имя — прыгает на указанный шаг (должен быть в $steps).
+     * Без аргумента — переходит к следующему по массиву $steps; если текущий последний — завершает поток.
+     * @param ?string $name Имя шага для явного перехода
      * @return void
+     * @throws \InvalidArgumentException Если указанный шаг отсутствует в $steps
      * @throws \Throwable При ошибках хранилища или драйвера
      */
-    protected function nextStep(): void
+    protected function nextStep(?string $name = null): void
     {
+        if ($name !== null) {
+            if (! in_array($name, $this->steps, true)) {
+                throw new \InvalidArgumentException(
+                    "Step '{$name}' not found in flow " . static::class
+                );
+            }
+            $this->saveState($name);
+            $this->executeAsk($name);
+            return;
+        }
+
         $stateRecord = $this->storage->get($this->chatId, $this->driverName);
         $currentStep = $stateRecord['current_step'] ?? $this->steps[0];
         $currentIndex = array_search($currentStep, $this->steps);
 
         if ($currentIndex === false || $currentIndex >= count($this->steps) - 1) {
-            // Last step — complete
-            $this->storage->delete($this->chatId, $this->driverName);
-            $this->onComplete();
+            $this->completeFlow();
             return;
         }
 
         $nextStep = $this->steps[$currentIndex + 1];
         $this->saveState($nextStep);
         $this->executeAsk($nextStep);
+    }
+
+    /** Завершить поток: очистить состояние и вызвать onComplete().
+     * @return void
+     * @throws \Throwable При ошибке хранилища
+     */
+    protected function completeFlow(): void
+    {
+        $this->storage->delete($this->chatId, $this->driverName);
+        $this->onComplete();
     }
 
     /** Отправить текстовый ответ пользователю.

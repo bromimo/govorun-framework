@@ -185,6 +185,52 @@ class FlowTest extends TestCase
 
         $this->assertTrue($shouldInterrupt);
     }
+
+    public function test_next_step_with_name_jumps_to_named_step(): void
+    {
+        $driver = $this->makeDriver();
+        $flow = new TestBranchingFlow($this->storage, $driver, $this->makeMessage());
+        $flow->start();
+
+        // start показывает ask первого шага; теперь отвечаем 'man' → должен прыгнуть на askMan
+        $this->sent = [];
+        $flow = new TestBranchingFlow($this->storage, $driver, $this->makeMessage('man'));
+        $flow->resume();
+
+        $this->assertCount(1, $this->sent);
+        $this->assertSame('Мужской вопрос', $this->sent[0]->text);
+
+        $state = $this->storage->get('100', 'telegram');
+        $this->assertSame('askMan', $state['current_step']);
+    }
+
+    public function test_next_step_with_unknown_name_throws(): void
+    {
+        $driver = $this->makeDriver();
+        $flow = new TestBranchingFlow($this->storage, $driver, $this->makeMessage());
+        $flow->start();
+
+        $this->expectException(\InvalidArgumentException::class);
+
+        $flow = new TestBranchingFlow($this->storage, $driver, $this->makeMessage('broken'));
+        $flow->resume();
+    }
+
+    public function test_complete_flow_clears_state_and_calls_on_complete(): void
+    {
+        $driver = $this->makeDriver();
+        $flow = new TestBranchingFlow($this->storage, $driver, $this->makeMessage());
+        $flow->start();
+
+        $this->sent = [];
+        $flow = new TestBranchingFlow($this->storage, $driver, $this->makeMessage('woman'));
+        $flow->resume();
+
+        // woman → completeFlow напрямую
+        $this->assertCount(1, $this->sent);
+        $this->assertSame('Done', $this->sent[0]->text);
+        $this->assertNull($this->storage->get('100', 'telegram'));
+    }
 }
 
 class TestBookingFlow extends Flow
@@ -214,5 +260,46 @@ class TestBookingFlow extends Flow
     public function onComplete(): void
     {
         $this->reply('Booked!');
+    }
+}
+
+class TestBranchingFlow extends Flow
+{
+    // askWoman стоит между askGender и askMan умышленно: это делает
+    // test_next_step_with_name_jumps_to_named_step настоящим true-positive — при
+    // сломанной реализации nextStep(?string) поток без аргумента ушёл бы в askWoman.
+    protected array $steps = ['askGender', 'askWoman', 'askMan'];
+
+    public function askGenderStep(Step $step): void
+    {
+        $step->ask('Пол?');
+        $step->receive(function (IncomingMessage $message) {
+            match ($message->text) {
+                'man'   => (function () { $this->nextStep('askMan'); return; })(),
+                'woman' => (function () { $this->completeFlow(); return; })(),
+                default => (function () { $this->nextStep('nonexistent'); return; })(),
+            };
+        });
+    }
+
+    public function askWomanStep(Step $step): void
+    {
+        $step->ask('Женский вопрос');
+        $step->receive(function (IncomingMessage $message) {
+            $this->completeFlow();
+        });
+    }
+
+    public function askManStep(Step $step): void
+    {
+        $step->ask('Мужской вопрос');
+        $step->receive(function (IncomingMessage $message) {
+            $this->completeFlow();
+        });
+    }
+
+    public function onComplete(): void
+    {
+        $this->reply('Done');
     }
 }
