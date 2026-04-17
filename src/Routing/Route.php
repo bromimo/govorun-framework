@@ -14,12 +14,17 @@ class Route
     protected static array $middlewareStack = [];
 
     /** Зарегистрировать маршрут для команды (например, /start).
-     * @param string $name Имя команды без слэша
+     * Имя команды хранится с ведущим слешем; если вызывающий передал имя без слеша,
+     * он будет добавлен автоматически.
+     * @param string $name Имя команды (со слешем или без — будет нормализовано к виду /name)
      * @param mixed $action Обработчик маршрута
      * @return RouteEntry
      */
     public static function command(string $name, mixed $action): RouteEntry
     {
+        if (! str_starts_with($name, '/')) {
+            $name = '/' . $name;
+        }
         return static::addRoute('command', $name, $action);
     }
 
