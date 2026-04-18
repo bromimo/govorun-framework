@@ -2,14 +2,14 @@
 
 namespace Govorun\Tests\Unit\Testing;
 
-use Govorun\Foundation\Application;
 use Govorun\Http\Request;
-use Govorun\Messaging\ContentType;
-use Govorun\Messaging\Dto\UserDto;
-use Govorun\Messaging\IncomingMessage;
 use Govorun\Messaging\Message;
 use Govorun\Testing\FakeDriver;
 use PHPUnit\Framework\TestCase;
+use Govorun\Messaging\ContentType;
+use Govorun\Messaging\Dto\UserDto;
+use Govorun\Foundation\Application;
+use Govorun\Messaging\IncomingMessage;
 
 class FakeDriverTest extends TestCase
 {
