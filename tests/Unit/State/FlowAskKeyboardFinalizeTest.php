@@ -258,6 +258,20 @@ class FlowAskKeyboardFinalizeTest extends TestCase
         $state = $this->storage->get('100', 'telegram');
         $this->assertNull($state);
     }
+
+    public function test_second_resume_after_finalize_does_noop(): void
+    {
+        $this->storage->set('100', 'telegram', [
+            'flow_class' => InlineAskFlow::class,
+            'current_step' => 'pick',
+            'data' => [],
+        ]);
+
+        $flow = new InlineAskFlow($this->storage, $this->driver, $this->makeMessage(action: 'yes'));
+        $flow->resume();
+
+        $this->assertCount(0, $this->driver->getEditedMessages());
+    }
 }
 
 /** Flow с одной ask_keyboard для тестов финализации. */
