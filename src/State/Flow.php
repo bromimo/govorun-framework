@@ -154,6 +154,7 @@ abstract class Flow
      */
     protected function completeFlow(): void
     {
+        $this->finalizeAskKeyboard($this->message->action ?? null, false);
         $this->storage->delete($this->chatId, $this->driverName);
         $this->onComplete();
     }
@@ -282,6 +283,66 @@ abstract class Flow
             'current_step' => $this->currentStepName(),
             'data' => $this->state->all(),
         ]);
+    }
+
+    /** Завершить активную ask_keyboard: редактировать исходное сообщение (убрать клавиатуру,
+     * дописать «(выбрано: X)» или «(отменено)») и очистить контекст.
+     * @param ?string $selectedAction Action нажатой кнопки или null, если нет выбора
+     * @param bool $cancelled Признак отмены (onCancel path)
+     * @return void
+     */
+    private function finalizeAskKeyboard(?string $selectedAction, bool $cancelled = false): void
+    {
+        if (! $this->state->has('__ask_keyboard_ctx')) {
+            return;
+        }
+
+        $ctx = $this->state->get('__ask_keyboard_ctx');
+
+        if (! $cancelled && ($selectedAction === null || $selectedAction === '')) {
+            $this->clearAskKeyboardContext();
+            return;
+        }
+
+        $suffix = $cancelled
+            ? '(отменено)'
+            : '(выбрано: ' . ($ctx['label_map'][$selectedAction] ?? $selectedAction) . ')';
+
+        $msg = Message::make($ctx['original_text'] . "\n\n" . $suffix);
+        $msg->chatId = $this->chatId;
+
+        if ($ctx['parse_mode'] !== null) {
+            $msg->parseMode($ctx['parse_mode']);
+        }
+
+        try {
+            $this->driver->edit($ctx['message_id'], $msg);
+        } catch (\Throwable) {
+            // Мёртвый edit не должен ронять Flow.
+        }
+
+        $this->clearAskKeyboardContext();
+    }
+
+    /** Удалить контекст ask_keyboard из state и сохранить.
+     * @return void
+     * @throws \Throwable При ошибке хранилища
+     */
+    private function clearAskKeyboardContext(): void
+    {
+        $data = $this->state->all();
+        unset($data['__ask_keyboard_ctx']);
+        $this->state = new StateData($data);
+
+        $record = $this->storage->get($this->chatId, $this->driverName);
+
+        if ($record !== null) {
+            $this->storage->set($this->chatId, $this->driverName, [
+                'flow_class' => $record['flow_class'],
+                'current_step' => $record['current_step'],
+                'data' => $data,
+            ]);
+        }
     }
 
     /** Получить имя текущего шага из хранилища.

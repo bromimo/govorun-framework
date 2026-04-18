@@ -106,6 +106,80 @@ class FlowAskKeyboardFinalizeTest extends TestCase
         $state = $this->storage->get('100', 'telegram');
         $this->assertArrayNotHasKey('__ask_keyboard_ctx', $state['data'] ?? []);
     }
+
+    public function test_finalize_edits_message_with_selected_label(): void
+    {
+        $this->storage->set('100', 'telegram', [
+            'flow_class' => InlineAskFlow::class,
+            'current_step' => 'pick',
+            'data' => [
+                '__ask_keyboard_ctx' => [
+                    'message_id' => '42',
+                    'original_text' => 'Выбери',
+                    'parse_mode' => null,
+                    'label_map' => ['yes' => 'Да', 'no' => 'Нет'],
+                ],
+            ],
+        ]);
+
+        $message = $this->makeMessage(action: 'yes');
+        $flow = new InlineAskFlow($this->storage, $this->driver, $message);
+
+        $flow->resume();
+
+        $edited = $this->driver->getEditedMessages();
+        $this->assertCount(1, $edited);
+        $this->assertSame('42', $edited[0]['messageId']);
+        $this->assertSame("Выбери\n\n(выбрано: Да)", $edited[0]['message']->text);
+        $this->assertNull($edited[0]['message']->keyboard);
+    }
+
+    public function test_finalize_fallback_uses_action_when_label_missing(): void
+    {
+        $this->storage->set('100', 'telegram', [
+            'flow_class' => InlineAskFlow::class,
+            'current_step' => 'pick',
+            'data' => [
+                '__ask_keyboard_ctx' => [
+                    'message_id' => '42',
+                    'original_text' => 'Q',
+                    'parse_mode' => null,
+                    'label_map' => ['yes' => 'Да'],
+                ],
+            ],
+        ]);
+
+        $flow = new InlineAskFlow($this->storage, $this->driver, $this->makeMessage(action: 'maybe'));
+        $flow->resume();
+
+        $edited = $this->driver->getEditedMessages();
+        $this->assertCount(1, $edited);
+        $this->assertSame("Q\n\n(выбрано: maybe)", $edited[0]['message']->text);
+    }
+
+    public function test_finalize_skips_edit_on_empty_action(): void
+    {
+        $this->storage->set('100', 'telegram', [
+            'flow_class' => InlineAskFlow::class,
+            'current_step' => 'pick',
+            'data' => [
+                '__ask_keyboard_ctx' => [
+                    'message_id' => '42',
+                    'original_text' => 'Q',
+                    'parse_mode' => null,
+                    'label_map' => ['yes' => 'Да'],
+                ],
+            ],
+        ]);
+
+        $flow = new InlineAskFlow($this->storage, $this->driver, $this->makeMessage(text: 'blah'));
+        $flow->resume();
+
+        $this->assertCount(0, $this->driver->getEditedMessages());
+
+        $state = $this->storage->get('100', 'telegram');
+        $this->assertArrayNotHasKey('__ask_keyboard_ctx', $state['data'] ?? []);
+    }
 }
 
 /** Flow с одной ask_keyboard для тестов финализации. */
