@@ -4,6 +4,7 @@ namespace Govorun\State;
 
 use Govorun\Messaging\Message;
 use Govorun\Support\Validator;
+use Govorun\Messaging\Keyboard;
 use Govorun\Messaging\ContentType;
 use Govorun\Contracts\StateStorage;
 use Govorun\Contracts\MessengerDriver;
@@ -210,18 +211,88 @@ abstract class Flow
 
         $askText = $step->getAskText();
 
-        if ($askText !== null) {
-            $askCallback = $step->getAskCallback();
+        if ($askText === null) {
+            return;
+        }
 
-            if ($askCallback !== null) {
-                $keyboard = $askCallback->call($this);
-                $msg = Message::make($askText)->keyboard($keyboard);
-                $msg->chatId = $this->chatId;
-                $this->driver->send($msg);
-            } else {
-                $this->reply($askText);
+        $askCallback = $step->getAskCallback();
+
+        if ($askCallback === null) {
+            $this->reply($askText);
+            return;
+        }
+
+        $keyboard = $askCallback->call($this);
+        $msg = Message::make($askText)->keyboard($keyboard);
+        $msg->chatId = $this->chatId;
+
+        $sentId = $this->driver->send($msg);
+
+        $this->captureAskKeyboardContext($sentId, $askText, $msg->parseMode, $keyboard);
+    }
+
+    /** Сохранить контекст отправленного ask_keyboard для последующего edit.
+     * Пишет только для inline-клавиатур с callback-кнопками и при не-null message_id.
+     * @param ?string $messageId Id отправленного сообщения от драйвера
+     * @param string $originalText Исходный текст ask
+     * @param ?string $parseMode Режим разметки
+     * @param Keyboard $keyboard Клавиатура
+     * @return void
+     * @throws \Throwable При ошибке хранилища
+     */
+    private function captureAskKeyboardContext(
+        ?string $messageId,
+        string $originalText,
+        ?string $parseMode,
+        Keyboard $keyboard,
+    ): void {
+        if ($messageId === null) {
+            return;
+        }
+
+        $data = $keyboard->toArray();
+
+        if ($data['type'] !== 'inline' || $data['remove']) {
+            return;
+        }
+
+        $labelMap = [];
+
+        foreach ($data['rows'] as $row) {
+            foreach ($row as $btn) {
+                if (isset($btn['action'])) {
+                    $labelMap[$btn['action']] = $btn['text'];
+                }
             }
         }
+
+        if (empty($labelMap)) {
+            return;
+        }
+
+        $this->state->set('__ask_keyboard_ctx', [
+            'message_id' => $messageId,
+            'original_text' => $originalText,
+            'parse_mode' => $parseMode,
+            'label_map' => $labelMap,
+        ]);
+
+        $this->storage->set($this->chatId, $this->driverName, [
+            'flow_class' => static::class,
+            'current_step' => $this->currentStepName(),
+            'data' => $this->state->all(),
+        ]);
+    }
+
+    /** Получить имя текущего шага из хранилища.
+     * @return string
+     * @throws \Throwable При ошибке хранилища
+     */
+    private function currentStepName(): string
+    {
+        $record = $this->storage->get($this->chatId, $this->driverName);
+
+        return $record['current_step'] ?? $this->steps[0];
     }
 
     /** Сохранить текущее состояние потока в хранилище.
