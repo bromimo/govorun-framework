@@ -20,6 +20,12 @@ class FakeDriver implements MessengerDriver
     /** @var OutgoingMessage[] Накопленные отправленные сообщения */
     private array $sentMessages = [];
 
+    /** @var int Счётчик синтетических message_id */
+    private int $messageIdCounter = 0;
+
+    /** @var array<int, array{messageId: string, message: OutgoingMessage}> Записанные edit-вызовы */
+    private array $editedMessages = [];
+
     /** Добавляет сообщение в очередь входящих.
      * @param IncomingMessage $message Входящее сообщение
      * @return void
@@ -52,21 +58,27 @@ class FakeDriver implements MessengerDriver
         return array_shift($this->pendingMessages);
     }
 
-    /** Накапливает отправленное сообщение.
+    /** Накапливает отправленное сообщение и выдаёт синтетический message_id.
      * @param OutgoingMessage $message Исходящее сообщение
-     * @return void
+     * @return ?string Синтетический message_id (последовательные строки "1", "2", ...)
      */
-    public function send(OutgoingMessage $message): void
+    public function send(OutgoingMessage $message): ?string
     {
         $this->sentMessages[] = $message;
+        $this->messageIdCounter++;
+
+        return (string) $this->messageIdCounter;
     }
 
-    /** Редактирование сообщения — заглушка.
+    /** Записывает edit-вызов в журнал.
      * @param string          $messageId Идентификатор сообщения
      * @param OutgoingMessage $message   Исходящее сообщение
      * @return void
      */
-    public function edit(string $messageId, OutgoingMessage $message): void {}
+    public function edit(string $messageId, OutgoingMessage $message): void
+    {
+        $this->editedMessages[] = ['messageId' => $messageId, 'message' => $message];
+    }
 
     /** Удаление сообщения — заглушка.
      * @param string $messageId Идентификатор сообщения
@@ -115,5 +127,21 @@ class FakeDriver implements MessengerDriver
     public function resetSentMessages(): void
     {
         $this->sentMessages = [];
+    }
+
+    /** Возвращает массив зафиксированных edit-вызовов.
+     * @return array<int, array{messageId: string, message: OutgoingMessage}>
+     */
+    public function getEditedMessages(): array
+    {
+        return $this->editedMessages;
+    }
+
+    /** Сбрасывает журнал edit-вызовов.
+     * @return void
+     */
+    public function resetEditedMessages(): void
+    {
+        $this->editedMessages = [];
     }
 }

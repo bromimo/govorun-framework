@@ -267,14 +267,13 @@ class TelegramDriver implements MessengerDriver
 
     /** Отправить исходящее сообщение пользователю.
      * @param OutgoingMessage $message Исходящее сообщение для отправки
-     * @return void
+     * @return ?string Идентификатор отправленного сообщения или null
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    public function send(OutgoingMessage $message): void
+    public function send(OutgoingMessage $message): ?string
     {
         if ($message->media !== null) {
-            $this->sendMedia($message);
-            return;
+            return $this->sendMedia($message);
         }
 
         $payload = [
@@ -290,7 +289,9 @@ class TelegramDriver implements MessengerDriver
             $payload['reply_markup'] = $this->buildKeyboardMarkup($message->keyboard);
         }
 
-        $this->apiCall('sendMessage', $payload);
+        $response = $this->apiCall('sendMessage', $payload);
+
+        return $this->extractMessageId($response);
     }
 
     /** Редактировать ранее отправленное сообщение.
@@ -334,10 +335,10 @@ class TelegramDriver implements MessengerDriver
 
     /** Отправить медиа-сообщение (фото, видео, документ и др.).
      * @param OutgoingMessage $message Исходящее сообщение с медиа
-     * @return void
+     * @return ?string Идентификатор отправленного сообщения или null
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    private function sendMedia(OutgoingMessage $message): void
+    private function sendMedia(OutgoingMessage $message): ?string
     {
         $media = $message->media;
         $type = $media['type'];
@@ -367,7 +368,24 @@ class TelegramDriver implements MessengerDriver
             $payload['parse_mode'] = $message->parseMode;
         }
 
-        $this->apiCall($method, $payload);
+        $response = $this->apiCall($method, $payload);
+
+        return $this->extractMessageId($response);
+    }
+
+    /** Извлечь message_id из ответа Telegram API.
+     * @param array<string, mixed> $response Ответ API
+     * @return ?string Идентификатор сообщения строкой или null
+     */
+    private function extractMessageId(array $response): ?string
+    {
+        if (($response['ok'] ?? false) !== true) {
+            return null;
+        }
+
+        $id = $response['result']['message_id'] ?? null;
+
+        return $id !== null ? (string) $id : null;
     }
 
     /** Построить разметку клавиатуры для Telegram API.

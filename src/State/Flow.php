@@ -4,6 +4,7 @@ namespace Govorun\State;
 
 use Govorun\Messaging\Message;
 use Govorun\Support\Validator;
+use Govorun\Messaging\Keyboard;
 use Govorun\Messaging\ContentType;
 use Govorun\Contracts\StateStorage;
 use Govorun\Contracts\MessengerDriver;
@@ -122,6 +123,8 @@ abstract class Flow
      */
     protected function nextStep(?string $name = null): void
     {
+        $this->finalizeAskKeyboard($this->message->action ?? null, false);
+
         if ($name !== null) {
             if (! in_array($name, $this->steps, true)) {
                 throw new \InvalidArgumentException(
@@ -153,6 +156,7 @@ abstract class Flow
      */
     protected function completeFlow(): void
     {
+        $this->finalizeAskKeyboard($this->message->action ?? null, false);
         $this->storage->delete($this->chatId, $this->driverName);
         $this->onComplete();
     }
@@ -183,12 +187,13 @@ abstract class Flow
     public function onComplete(): void {}
 
     /** Обработчик отмены потока.
-     * Удаляет состояние из хранилища.
+     * Редактирует последнюю ask_keyboard (если активна) и удаляет состояние из хранилища.
      * @return void
      * @throws \Throwable При ошибке хранилища
      */
     public function onCancel(): void
     {
+        $this->finalizeAskKeyboard(null, true);
         $this->storage->delete($this->chatId, $this->driverName);
     }
 
@@ -210,18 +215,148 @@ abstract class Flow
 
         $askText = $step->getAskText();
 
-        if ($askText !== null) {
-            $askCallback = $step->getAskCallback();
+        if ($askText === null) {
+            return;
+        }
 
-            if ($askCallback !== null) {
-                $keyboard = $askCallback->call($this);
-                $msg = Message::make($askText)->keyboard($keyboard);
-                $msg->chatId = $this->chatId;
-                $this->driver->send($msg);
-            } else {
-                $this->reply($askText);
+        $askCallback = $step->getAskCallback();
+
+        if ($askCallback === null) {
+            $this->reply($askText);
+            return;
+        }
+
+        $keyboard = $askCallback->call($this);
+        $msg = Message::make($askText)->keyboard($keyboard);
+        $msg->chatId = $this->chatId;
+
+        $sentId = $this->driver->send($msg);
+
+        $this->captureAskKeyboardContext($sentId, $askText, $msg->parseMode, $keyboard);
+    }
+
+    /** Сохранить контекст отправленного ask_keyboard для последующего edit.
+     * Пишет только для inline-клавиатур с callback-кнопками и при не-null message_id.
+     * @param ?string $messageId Id отправленного сообщения от драйвера
+     * @param string $originalText Исходный текст ask
+     * @param ?string $parseMode Режим разметки
+     * @param Keyboard $keyboard Клавиатура
+     * @return void
+     * @throws \Throwable При ошибке хранилища
+     */
+    private function captureAskKeyboardContext(
+        ?string $messageId,
+        string $originalText,
+        ?string $parseMode,
+        Keyboard $keyboard,
+    ): void {
+        if ($messageId === null) {
+            return;
+        }
+
+        $data = $keyboard->toArray();
+
+        if ($data['type'] !== 'inline' || $data['remove']) {
+            return;
+        }
+
+        $labelMap = [];
+
+        foreach ($data['rows'] as $row) {
+            foreach ($row as $btn) {
+                if (isset($btn['action'])) {
+                    $labelMap[$btn['action']] = $btn['text'];
+                }
             }
         }
+
+        if (empty($labelMap)) {
+            return;
+        }
+
+        $this->state->set('__ask_keyboard_ctx', [
+            'message_id' => $messageId,
+            'original_text' => $originalText,
+            'parse_mode' => $parseMode,
+            'label_map' => $labelMap,
+        ]);
+
+        $this->storage->set($this->chatId, $this->driverName, [
+            'flow_class' => static::class,
+            'current_step' => $this->currentStepName(),
+            'data' => $this->state->all(),
+        ]);
+    }
+
+    /** Завершить активную ask_keyboard: редактировать исходное сообщение (убрать клавиатуру,
+     * дописать «(выбрано: X)» или «(отменено)») и очистить контекст.
+     * @param ?string $selectedAction Action нажатой кнопки или null, если нет выбора
+     * @param bool $cancelled Признак отмены (onCancel path)
+     * @return void
+     */
+    private function finalizeAskKeyboard(?string $selectedAction, bool $cancelled = false): void
+    {
+        if (! $this->state->has('__ask_keyboard_ctx')) {
+            return;
+        }
+
+        $ctx = $this->state->get('__ask_keyboard_ctx');
+
+        if (! $cancelled && ($selectedAction === null || $selectedAction === '')) {
+            $this->clearAskKeyboardContext();
+            return;
+        }
+
+        $suffix = $cancelled
+            ? '(отменено)'
+            : '(выбрано: ' . ($ctx['label_map'][$selectedAction] ?? $selectedAction) . ')';
+
+        $msg = Message::make($ctx['original_text'] . "\n\n" . $suffix);
+        $msg->chatId = $this->chatId;
+
+        if ($ctx['parse_mode'] !== null) {
+            $msg->parseMode($ctx['parse_mode']);
+        }
+
+        try {
+            $this->driver->edit($ctx['message_id'], $msg);
+        } catch (\Throwable) {
+            // Мёртвый edit не должен ронять Flow.
+        }
+
+        $this->clearAskKeyboardContext();
+    }
+
+    /** Удалить контекст ask_keyboard из state и сохранить.
+     * @return void
+     * @throws \Throwable При ошибке хранилища
+     */
+    private function clearAskKeyboardContext(): void
+    {
+        $data = $this->state->all();
+        unset($data['__ask_keyboard_ctx']);
+        $this->state = new StateData($data);
+
+        $record = $this->storage->get($this->chatId, $this->driverName);
+
+        if ($record !== null) {
+            $this->storage->set($this->chatId, $this->driverName, [
+                'flow_class' => $record['flow_class'],
+                'current_step' => $record['current_step'],
+                'data' => $data,
+            ]);
+        }
+    }
+
+    /** Получить имя текущего шага из хранилища.
+     * @return string
+     * @throws \Throwable При ошибке хранилища
+     */
+    private function currentStepName(): string
+    {
+        $record = $this->storage->get($this->chatId, $this->driverName);
+
+        return $record['current_step'] ?? $this->steps[0];
     }
 
     /** Сохранить текущее состояние потока в хранилище.

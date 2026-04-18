@@ -2,14 +2,14 @@
 
 namespace Govorun\Tests\Unit\Testing;
 
-use Govorun\Foundation\Application;
 use Govorun\Http\Request;
-use Govorun\Messaging\ContentType;
-use Govorun\Messaging\Dto\UserDto;
-use Govorun\Messaging\IncomingMessage;
 use Govorun\Messaging\Message;
 use Govorun\Testing\FakeDriver;
 use PHPUnit\Framework\TestCase;
+use Govorun\Messaging\ContentType;
+use Govorun\Messaging\Dto\UserDto;
+use Govorun\Foundation\Application;
+use Govorun\Messaging\IncomingMessage;
 
 class FakeDriverTest extends TestCase
 {
@@ -93,5 +93,31 @@ class FakeDriverTest extends TestCase
     {
         $user = $this->driver->getUser('42');
         $this->assertSame('42', $user->id);
+    }
+
+    public function test_send_returns_sequential_message_ids(): void
+    {
+        $driver = new FakeDriver();
+        $msg1 = Message::make('a');
+        $msg1->chatId = '1';
+        $msg2 = Message::make('b');
+        $msg2->chatId = '1';
+
+        $this->assertSame('1', $driver->send($msg1));
+        $this->assertSame('2', $driver->send($msg2));
+    }
+
+    public function test_edit_records_calls(): void
+    {
+        $driver = new FakeDriver();
+        $msg = Message::make('new text');
+        $msg->chatId = '1';
+
+        $driver->edit('42', $msg);
+
+        $edited = $driver->getEditedMessages();
+        $this->assertCount(1, $edited);
+        $this->assertSame('42', $edited[0]['messageId']);
+        $this->assertSame($msg, $edited[0]['message']);
     }
 }
