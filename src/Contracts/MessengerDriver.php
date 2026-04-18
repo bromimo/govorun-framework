@@ -28,10 +28,10 @@ interface MessengerDriver
 
     /** Отправить исходящее сообщение пользователю.
      * @param OutgoingMessage $message Исходящее сообщение для отправки
-     * @return void
+     * @return ?string Идентификатор отправленного сообщения или null
      * @throws \Throwable
      */
-    public function send(OutgoingMessage $message): void;
+    public function send(OutgoingMessage $message): ?string;
 
     /** Редактировать ранее отправленное сообщение.
      * @param string $messageId Идентификатор сообщения для редактирования

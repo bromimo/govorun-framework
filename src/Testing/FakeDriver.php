@@ -54,11 +54,12 @@ class FakeDriver implements MessengerDriver
 
     /** Накапливает отправленное сообщение.
      * @param OutgoingMessage $message Исходящее сообщение
-     * @return void
+     * @return ?string Всегда null (фейковый драйвер)
      */
-    public function send(OutgoingMessage $message): void
+    public function send(OutgoingMessage $message): ?string
     {
         $this->sentMessages[] = $message;
+        return null;
     }
 
     /** Редактирование сообщения — заглушка.

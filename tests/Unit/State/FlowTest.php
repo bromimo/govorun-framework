@@ -49,7 +49,7 @@ class FlowTest extends TestCase
             public function parseUpdate(Request $request): IncomingMessage {
                 return new IncomingMessage(id: '1', chatId: '1', driverName: 'telegram', text: '', user: new UserDto(id: '1'), type: ContentType::Text);
             }
-            public function send(OutgoingMessage $message): void { $this->sent[] = $message; }
+            public function send(OutgoingMessage $message): ?string { $this->sent[] = $message; return null; }
             public function edit(string $messageId, OutgoingMessage $message): void {}
             public function delete(string $messageId, string $chatId): void {}
             public function installWebhook(string $url): bool { return true; }

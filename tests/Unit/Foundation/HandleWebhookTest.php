@@ -53,9 +53,10 @@ class HandleWebhookTest extends TestCase
                 return $this->message;
             }
 
-            public function send(OutgoingMessage $message): void
+            public function send(OutgoingMessage $message): ?string
             {
                 $this->sent[] = $message;
+                return null;
             }
 
             public function edit(string $messageId, OutgoingMessage $message): void {}
@@ -109,7 +110,7 @@ class HandleWebhookTest extends TestCase
             ) {}
             public function verifyWebhook(Request $request): bool { return false; }
             public function parseUpdate(Request $request): IncomingMessage { return $this->message; }
-            public function send(OutgoingMessage $message): void { $this->sent[] = $message; }
+            public function send(OutgoingMessage $message): ?string { $this->sent[] = $message; return null; }
             public function edit(string $messageId, OutgoingMessage $message): void {}
             public function delete(string $messageId, string $chatId): void {}
             public function installWebhook(string $url): bool { return true; }

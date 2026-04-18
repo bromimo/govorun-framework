@@ -183,4 +183,43 @@ class TelegramSendTest extends TestCase
         $this->assertSame('100', $body['chat_id']);
         $this->assertSame(456, $body['message_id']);
     }
+
+    public function test_send_returns_message_id(): void
+    {
+        $driver = $this->makeDriver([
+            new Response(200, [], '{"ok":true,"result":{"message_id":42}}'),
+        ]);
+        $msg = Message::make('Привет');
+        $msg->chatId = '100';
+
+        $id = $driver->send($msg);
+
+        $this->assertSame('42', $id);
+    }
+
+    public function test_send_returns_null_when_api_not_ok(): void
+    {
+        $driver = $this->makeDriver([
+            new Response(200, [], '{"ok":false,"description":"fail"}'),
+        ]);
+        $msg = Message::make('Привет');
+        $msg->chatId = '100';
+
+        $id = $driver->send($msg);
+
+        $this->assertNull($id);
+    }
+
+    public function test_send_media_returns_message_id(): void
+    {
+        $driver = $this->makeDriver([
+            new Response(200, [], '{"ok":true,"result":{"message_id":77}}'),
+        ]);
+        $msg = Media::photo('https://example.com/img.jpg');
+        $msg->chatId = '100';
+
+        $id = $driver->send($msg);
+
+        $this->assertSame('77', $id);
+    }
 }
