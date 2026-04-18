@@ -180,6 +180,84 @@ class FlowAskKeyboardFinalizeTest extends TestCase
         $state = $this->storage->get('100', 'telegram');
         $this->assertArrayNotHasKey('__ask_keyboard_ctx', $state['data'] ?? []);
     }
+
+    public function test_on_cancel_edits_message_with_cancelled_suffix(): void
+    {
+        $this->storage->set('100', 'telegram', [
+            'flow_class' => InlineAskFlow::class,
+            'current_step' => 'pick',
+            'data' => [
+                '__ask_keyboard_ctx' => [
+                    'message_id' => '42',
+                    'original_text' => 'Выбери',
+                    'parse_mode' => null,
+                    'label_map' => ['yes' => 'Да'],
+                ],
+            ],
+        ]);
+
+        $flow = new InlineAskFlow($this->storage, $this->driver, $this->makeMessage(text: '/cancel'));
+        $flow->onCancel();
+
+        $edited = $this->driver->getEditedMessages();
+        $this->assertCount(1, $edited);
+        $this->assertSame("Выбери\n\n(отменено)", $edited[0]['message']->text);
+    }
+
+    public function test_next_step_triggers_finalize(): void
+    {
+        $message = $this->makeMessage();
+        $flow = new TwoAskFlow($this->storage, $this->driver, $message);
+        $flow->start();
+
+        $this->driver->resetSentMessages();
+        $reply = $this->makeMessage(action: 'yes');
+        $flow = new TwoAskFlow($this->storage, $this->driver, $reply);
+        $flow->resume();
+
+        $edited = $this->driver->getEditedMessages();
+        $this->assertCount(1, $edited);
+        $this->assertSame("Первый\n\n(выбрано: Да)", $edited[0]['message']->text);
+
+        $sent = $this->driver->getSentMessages();
+        $this->assertCount(1, $sent);
+        $this->assertSame('Второй', $sent[0]->text);
+
+        $state = $this->storage->get('100', 'telegram');
+        $this->assertSame('secondStep', $state['current_step']);
+        $this->assertArrayHasKey('__ask_keyboard_ctx', $state['data']);
+        $this->assertSame('Второй', $state['data']['__ask_keyboard_ctx']['original_text']);
+    }
+
+    public function test_edit_throws_does_not_break_flow(): void
+    {
+        $this->storage->set('100', 'telegram', [
+            'flow_class' => InlineAskFlow::class,
+            'current_step' => 'pick',
+            'data' => [
+                '__ask_keyboard_ctx' => [
+                    'message_id' => '42',
+                    'original_text' => 'Q',
+                    'parse_mode' => null,
+                    'label_map' => ['yes' => 'Да'],
+                ],
+            ],
+        ]);
+
+        $throwingDriver = new class extends FakeDriver {
+            public function edit(string $messageId, \Govorun\Messaging\OutgoingMessage $message): void
+            {
+                throw new \RuntimeException('boom');
+            }
+        };
+
+        $flow = new InlineAskFlow($this->storage, $throwingDriver, $this->makeMessage(action: 'yes'));
+
+        $flow->resume();
+
+        $state = $this->storage->get('100', 'telegram');
+        $this->assertNull($state);
+    }
 }
 
 /** Flow с одной ask_keyboard для тестов финализации. */
@@ -223,6 +301,24 @@ class UrlOnlyAskFlow extends Flow
         $step->ask('Открой', fn () => Keyboard::make()
             ->button('Сайт', url: 'https://example.com')
         );
+        $step->receive(fn (IncomingMessage $m) => $this->completeFlow());
+    }
+}
+
+/** Flow с двумя ask_keyboard-шагами для проверки финализации при nextStep. */
+class TwoAskFlow extends Flow
+{
+    protected array $steps = ['firstStep', 'secondStep'];
+
+    public function firstStepStep(Step $step): void
+    {
+        $step->ask('Первый', fn () => Keyboard::make()->button('Да', 'yes'));
+        $step->receive(fn (IncomingMessage $m) => $this->nextStep('secondStep'));
+    }
+
+    public function secondStepStep(Step $step): void
+    {
+        $step->ask('Второй', fn () => Keyboard::make()->button('ОК', 'ok'));
         $step->receive(fn (IncomingMessage $m) => $this->completeFlow());
     }
 }

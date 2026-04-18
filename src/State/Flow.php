@@ -123,6 +123,8 @@ abstract class Flow
      */
     protected function nextStep(?string $name = null): void
     {
+        $this->finalizeAskKeyboard($this->message->action ?? null, false);
+
         if ($name !== null) {
             if (! in_array($name, $this->steps, true)) {
                 throw new \InvalidArgumentException(
@@ -185,12 +187,13 @@ abstract class Flow
     public function onComplete(): void {}
 
     /** Обработчик отмены потока.
-     * Удаляет состояние из хранилища.
+     * Редактирует последнюю ask_keyboard (если активна) и удаляет состояние из хранилища.
      * @return void
      * @throws \Throwable При ошибке хранилища
      */
     public function onCancel(): void
     {
+        $this->finalizeAskKeyboard(null, true);
         $this->storage->delete($this->chatId, $this->driverName);
     }
 
