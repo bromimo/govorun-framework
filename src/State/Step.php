@@ -3,30 +3,31 @@
 namespace Govorun\State;
 
 use Closure;
+use Govorun\Messaging\OutgoingMessage;
 
 /** Шаг диалогового потока.
  * Описывает один шаг (вопрос-ответ) внутри Flow:
- * текст вопроса, коллбэк для клавиатуры и коллбэк для обработки ответа.
+ * сообщение вопроса, коллбэк для клавиатуры и коллбэк для обработки ответа.
  */
 class Step
 {
-    private ?string $askText = null;
+    private string|OutgoingMessage|null $ask = null;
     private ?Closure $askCallback = null;
     private ?Closure $receiveCallback = null;
 
-    /** Задать текст вопроса и опциональный построитель клавиатуры.
-     * @param string $text Текст вопроса пользователю
-     * @param Closure|null $keyboardBuilder Коллбэк для создания клавиатуры
+    /** Задать вопрос шага и опциональный построитель клавиатуры.
+     * @param string|OutgoingMessage $message Текст вопроса или готовое исходящее сообщение (media, parseMode и т.п.).
+     * @param Closure|null $keyboardBuilder Коллбэк для создания клавиатуры.
      * @return void
      */
-    public function ask(string $text, ?Closure $keyboardBuilder = null): void
+    public function ask(string|OutgoingMessage $message, ?Closure $keyboardBuilder = null): void
     {
-        $this->askText = $text;
+        $this->ask = $message;
         $this->askCallback = $keyboardBuilder;
     }
 
     /** Задать коллбэк для обработки полученного ответа.
-     * @param Closure $callback Коллбэк обработки входящего сообщения
+     * @param Closure $callback Коллбэк обработки входящего сообщения.
      * @return void
      */
     public function receive(Closure $callback): void
@@ -34,12 +35,29 @@ class Step
         $this->receiveCallback = $callback;
     }
 
-    /** Получить текст вопроса.
+    /** Получить сообщение вопроса (строка или OutgoingMessage).
+     * @return string|OutgoingMessage|null
+     */
+    public function getAsk(): string|OutgoingMessage|null
+    {
+        return $this->ask;
+    }
+
+    /** Получить текст вопроса (для обратной совместимости).
+     * Возвращает строку для string-ask, caption для OutgoingMessage.
      * @return string|null
      */
     public function getAskText(): ?string
     {
-        return $this->askText;
+        if ($this->ask === null) {
+            return null;
+        }
+
+        if (is_string($this->ask)) {
+            return $this->ask;
+        }
+
+        return $this->ask->text;
     }
 
     /** Получить коллбэк построителя клавиатуры.
