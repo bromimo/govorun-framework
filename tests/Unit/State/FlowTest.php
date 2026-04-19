@@ -251,6 +251,72 @@ class FlowTest extends TestCase
         $this->assertSame('hello', $this->sent[0]->text);
         $this->assertSame('100', $this->sent[0]->chatId);
     }
+
+    public function test_ask_with_outgoing_message_is_sent_as_is(): void
+    {
+        eval(<<<'PHP'
+namespace Govorun\Tests\Unit\State;
+
+use Govorun\Messaging\Media;
+use Govorun\State\Flow;
+use Govorun\State\Step;
+
+class TestMediaAskFlow extends Flow {
+    protected array $steps = ['askPhoto'];
+
+    public function askPhotoStep(Step $step): void {
+        $step->ask(Media::photo('https://example.com/a.jpg')->caption('Смотри'));
+        $step->receive(function () {});
+    }
+}
+PHP);
+
+        $message = $this->makeMessage();
+        $driver = $this->makeDriver();
+
+        $flow = new TestMediaAskFlow($this->storage, $driver, $message);
+        $flow->start();
+
+        $this->assertCount(1, $this->sent);
+        $this->assertSame('Смотри', $this->sent[0]->text);
+        $this->assertSame(['type' => 'photo', 'url' => 'https://example.com/a.jpg'], $this->sent[0]->media);
+        $this->assertSame('100', $this->sent[0]->chatId);
+    }
+
+    public function test_ask_with_outgoing_message_and_keyboard_attaches_keyboard(): void
+    {
+        eval(<<<'PHP'
+namespace Govorun\Tests\Unit\State;
+
+use Govorun\Messaging\Keyboard;
+use Govorun\Messaging\Media;
+use Govorun\State\Flow;
+use Govorun\State\Step;
+
+class TestMediaAskKeyboardFlow extends Flow {
+    protected array $steps = ['askWithKbd'];
+
+    public function askWithKbdStep(Step $step): void {
+        $step->ask(
+            Media::photo('https://example.com/b.jpg')->caption('Выбор'),
+            fn () => Keyboard::make()->button('Да', 'yes')->button('Нет', 'no'),
+        );
+        $step->receive(function () {});
+    }
+}
+PHP);
+
+        $message = $this->makeMessage();
+        $driver = $this->makeDriver();
+
+        $flow = new TestMediaAskKeyboardFlow($this->storage, $driver, $message);
+        $flow->start();
+
+        $this->assertCount(1, $this->sent);
+        $this->assertSame('Выбор', $this->sent[0]->text);
+        $this->assertSame(['type' => 'photo', 'url' => 'https://example.com/b.jpg'], $this->sent[0]->media);
+        $this->assertNotNull($this->sent[0]->keyboard);
+    }
 }
 
 class TestBookingFlow extends Flow

@@ -210,9 +210,9 @@ abstract class Flow
     }
 
     /** Выполнить ask-фазу указанного шага.
-     * @param string $stepName Имя шага
+     * @param string $stepName Имя шага.
      * @return void
-     * @throws \Throwable При ошибке отправки через драйвер
+     * @throws \Throwable При ошибке отправки через драйвер.
      */
     private function executeAsk(string $stepName): void
     {
@@ -225,26 +225,32 @@ abstract class Flow
 
         $this->$method($step);
 
-        $askText = $step->getAskText();
+        $ask = $step->getAsk();
 
-        if ($askText === null) {
+        if ($ask === null) {
             return;
         }
 
         $askCallback = $step->getAskCallback();
+        $keyboard = $askCallback?->call($this);
 
-        if ($askCallback === null) {
-            $this->reply($askText);
-            return;
-        }
-
-        $keyboard = $askCallback->call($this);
-        $msg = Message::make($askText)->keyboard($keyboard);
+        $msg = $ask instanceof OutgoingMessage ? $ask : Message::make($ask);
         $msg->chatId = $this->chatId;
+
+        if ($keyboard !== null) {
+            $msg->keyboard($keyboard);
+        }
 
         $sentId = $this->driver->send($msg);
 
-        $this->captureAskKeyboardContext($sentId, $askText, $msg->parseMode, $keyboard);
+        if ($keyboard !== null) {
+            $this->captureAskKeyboardContext(
+                $sentId,
+                $msg->text ?? '',
+                $msg->parseMode,
+                $keyboard,
+            );
+        }
     }
 
     /** Сохранить контекст отправленного ask_keyboard для последующего edit.
