@@ -231,6 +231,26 @@ class FlowTest extends TestCase
         $this->assertSame('Done', $this->sent[0]->text);
         $this->assertNull($this->storage->get('100', 'telegram'));
     }
+
+    public function test_flow_send_dispatches_through_driver_with_chat_id(): void
+    {
+        $message = $this->makeMessage();
+        $driver = $this->makeDriver();
+
+        $flow = new class($this->storage, $driver, $message) extends Flow {
+            public function callSend(OutgoingMessage $msg): void {
+                $this->send($msg);
+            }
+        };
+
+        $outgoing = new OutgoingMessage();
+        $outgoing->text = 'hello';
+        $flow->callSend($outgoing);
+
+        $this->assertCount(1, $this->sent);
+        $this->assertSame('hello', $this->sent[0]->text);
+        $this->assertSame('100', $this->sent[0]->chatId);
+    }
 }
 
 class TestBookingFlow extends Flow

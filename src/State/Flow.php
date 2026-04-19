@@ -9,6 +9,7 @@ use Govorun\Messaging\ContentType;
 use Govorun\Contracts\StateStorage;
 use Govorun\Contracts\MessengerDriver;
 use Govorun\Messaging\IncomingMessage;
+use Govorun\Messaging\OutgoingMessage;
 
 /** Абстрактный диалоговый поток (Flow).
  * Базовый класс для пошаговых диалогов с пользователем.
@@ -171,6 +172,17 @@ abstract class Flow
         $msg = Message::make($text);
         $msg->chatId = $this->chatId;
         $this->driver->send($msg);
+    }
+
+    /** Отправить исходящее сообщение пользователю.
+     * @param OutgoingMessage $message Исходящее сообщение (media, text с клавиатурой и т.п.).
+     * @return void
+     * @throws \Throwable При ошибке отправки через драйвер.
+     */
+    protected function send(OutgoingMessage $message): void
+    {
+        $message->chatId = $this->chatId;
+        $this->driver->send($message);
     }
 
     /** Создать валидатор с автоматической отправкой ошибки пользователю.
