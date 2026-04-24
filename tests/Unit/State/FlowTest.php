@@ -288,10 +288,11 @@ PHP);
         eval(<<<'PHP'
 namespace Govorun\Tests\Unit\State;
 
-use Govorun\Messaging\Keyboard;
-use Govorun\Messaging\Media;
 use Govorun\State\Flow;
 use Govorun\State\Step;
+use Govorun\Messaging\Media;
+use Govorun\Messaging\Button;
+use Govorun\Messaging\Keyboard;
 
 class TestMediaAskKeyboardFlow extends Flow {
     protected array $steps = ['askWithKbd'];
@@ -299,7 +300,12 @@ class TestMediaAskKeyboardFlow extends Flow {
     public function askWithKbdStep(Step $step): void {
         $step->ask(
             Media::photo('https://example.com/b.jpg')->caption('Выбор'),
-            fn () => Keyboard::make()->button('Да', 'yes')->button('Нет', 'no'),
+            fn () => Keyboard::make()->buttons([
+                [
+                    Button::make('Да')->action('yes'),
+                    Button::make('Нет')->action('no'),
+                ],
+            ]),
         );
         $step->receive(function () {});
     }

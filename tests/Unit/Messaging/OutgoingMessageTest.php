@@ -2,9 +2,10 @@
 
 namespace Govorun\Tests\Unit\Messaging;
 
+use Govorun\Tests\TestCase;
+use Govorun\Messaging\Button;
 use Govorun\Messaging\Keyboard;
 use Govorun\Messaging\OutgoingMessage;
-use Govorun\Tests\TestCase;
 
 class OutgoingMessageTest extends TestCase
 {
@@ -33,7 +34,9 @@ class OutgoingMessageTest extends TestCase
 
     public function test_keyboard_sets_keyboard_data(): void
     {
-        $kb = Keyboard::make()->button('Click', action: 'btn');
+        $kb = Keyboard::make()->buttons([
+            [Button::make('Click')->action('btn')],
+        ]);
         $msg = new OutgoingMessage();
         $result = $msg->keyboard($kb);
 

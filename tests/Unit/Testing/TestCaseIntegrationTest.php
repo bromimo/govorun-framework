@@ -2,12 +2,13 @@
 
 namespace Govorun\Tests\Unit\Testing;
 
-use Govorun\Http\ApiClient;
-use Govorun\Messaging\Keyboard;
-use Govorun\Messaging\Message;
-use Govorun\Routing\Controller;
 use Govorun\Routing\Route;
+use Govorun\Http\ApiClient;
 use Govorun\Testing\TestCase;
+use Govorun\Routing\Controller;
+use Govorun\Messaging\Button;
+use Govorun\Messaging\Message;
+use Govorun\Messaging\Keyboard;
 
 class TestCaseIntegrationTest extends TestCase
 {
@@ -67,9 +68,12 @@ class IntegrationTestMenuController extends Controller
     {
         $msg = Message::make('Pick an option:')
             ->keyboard(
-                Keyboard::make()
-                    ->button('Alpha', 'select', ['item' => 'Alpha'])
-                    ->button('Beta', 'select', ['item' => 'Beta'])
+                Keyboard::make()->buttons([
+                    [
+                        Button::make('Alpha')->action('select', ['item' => 'Alpha']),
+                        Button::make('Beta')->action('select', ['item' => 'Beta']),
+                    ],
+                ]),
             );
         $this->send($msg);
     }

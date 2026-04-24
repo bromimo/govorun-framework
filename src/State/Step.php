@@ -3,6 +3,7 @@
 namespace Govorun\State;
 
 use Closure;
+use Govorun\Messaging\Keyboard;
 use Govorun\Messaging\OutgoingMessage;
 
 /** Шаг диалогового потока.
@@ -12,18 +13,20 @@ use Govorun\Messaging\OutgoingMessage;
 class Step
 {
     private string|OutgoingMessage|null $ask = null;
-    private ?Closure $askCallback = null;
+    private Closure|Keyboard|null $askCallback = null;
     private ?Closure $receiveCallback = null;
 
-    /** Задать вопрос шага и опциональный построитель клавиатуры.
-     * @param string|OutgoingMessage $message Текст вопроса или готовое исходящее сообщение (media, parseMode и т.п.).
-     * @param Closure|null $keyboardBuilder Коллбэк для создания клавиатуры.
+    /** Задать вопрос шага и опциональную клавиатуру.
+     * @param string|OutgoingMessage $message Текст вопроса или готовое исходящее сообщение
+     * @param Closure|Keyboard|null $keyboard Клавиатура напрямую или замыкание-билдер (для доступа к $this в Flow)
      * @return void
      */
-    public function ask(string|OutgoingMessage $message, ?Closure $keyboardBuilder = null): void
-    {
+    public function ask(
+        string|OutgoingMessage $message,
+        Closure|Keyboard|null $keyboard = null,
+    ): void {
         $this->ask = $message;
-        $this->askCallback = $keyboardBuilder;
+        $this->askCallback = $keyboard;
     }
 
     /** Задать коллбэк для обработки полученного ответа.
@@ -60,10 +63,10 @@ class Step
         return $this->ask->text;
     }
 
-    /** Получить коллбэк построителя клавиатуры.
-     * @return Closure|null
+    /** Получить клавиатуру или её билдер.
+     * @return Closure|Keyboard|null
      */
-    public function getAskCallback(): ?Closure
+    public function getAskCallback(): Closure|Keyboard|null
     {
         return $this->askCallback;
     }

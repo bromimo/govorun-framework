@@ -4,11 +4,12 @@ namespace Govorun\Messaging;
 
 /** Клавиатура с кнопками для исходящего сообщения.
  * Поддерживает inline- и reply-режимы, а также удаление клавиатуры.
+ * Ряды кнопок задаются через Keyboard::make()->buttons([[Button, …], [Button, …]]).
  */
 class Keyboard
 {
+    /** @var array<int, array<int, Button>> */
     private array $rows = [];
-    private array $currentRow = [];
     private string $type = 'inline';
     private bool $remove = false;
 
@@ -17,7 +18,7 @@ class Keyboard
      */
     public static function make(): static
     {
-        return new static();
+        return new static;
     }
 
     /** Создать reply-клавиатуру.
@@ -25,7 +26,7 @@ class Keyboard
      */
     public static function reply(): static
     {
-        $kb = new static();
+        $kb = new static;
         $kb->type = 'reply';
 
         return $kb;
@@ -36,43 +37,19 @@ class Keyboard
      */
     public static function remove(): static
     {
-        $kb = new static();
+        $kb = new static;
         $kb->remove = true;
 
         return $kb;
     }
 
-    /** Добавить кнопку в текущий ряд.
-     * @param string      $text            Текст кнопки.
-     * @param string|null $action          Действие при нажатии.
-     * @param array|null  $param           Параметры действия.
-     * @param string|null $url             URL-ссылка кнопки.
-     * @param bool        $requestContact  Запросить контакт пользователя.
-     * @param bool        $requestLocation Запросить геолокацию пользователя.
+    /** Задать матрицу кнопок: внешний массив — ряды, внутренние — кнопки в ряду.
+     * @param array<int, array<int, Button>> $rows Ряды с кнопками
      * @return static
      */
-    public function button(
-        string $text,
-        ?string $action = null,
-        ?array $param = null,
-        ?string $url = null,
-        bool $requestContact = false,
-        bool $requestLocation = false,
-    ): static {
-        $this->currentRow[] = new Button($text, $action, $param, $url, $requestContact, $requestLocation);
-
-        return $this;
-    }
-
-    /** Завершить текущий ряд и начать новый.
-     * @return static
-     */
-    public function row(): static
+    public function buttons(array $rows): static
     {
-        if (! empty($this->currentRow)) {
-            $this->rows[] = $this->currentRow;
-            $this->currentRow = [];
-        }
+        $this->rows = $rows;
 
         return $this;
     }
@@ -82,21 +59,15 @@ class Keyboard
      */
     public function toArray(): array
     {
-        $rows = $this->rows;
-
-        if (! empty($this->currentRow)) {
-            $rows[] = $this->currentRow;
-        }
-
         return [
             'type' => $this->type,
             'remove' => $this->remove,
             'rows' => array_map(
                 fn (array $row) => array_map(
                     fn (Button $btn) => $btn->toArray(),
-                    $row
+                    $row,
                 ),
-                $rows
+                $this->rows,
             ),
         ];
     }
