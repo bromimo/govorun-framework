@@ -16,27 +16,32 @@ use Govorun\Messaging\OutgoingMessage;
  */
 abstract class Controller
 {
+    protected IncomingMessage $message;
     protected IncomingMessage $incomingMessage;
     protected MessengerDriver $driver;
     protected ?StateStorage $stateStorage = null;
 
     /** Установить контекст выполнения контроллера.
+     * Выставляет оба свойства — $message (рекомендуемое, симметрично с Flow)
+     * и $incomingMessage (deprecated-алиас для обратной совместимости).
      * @param IncomingMessage $message Входящее сообщение
      * @param MessengerDriver $driver Драйвер мессенджера
      * @return void
      */
     public function setContext(IncomingMessage $message, MessengerDriver $driver): void
     {
+        $this->message = $message;
         $this->incomingMessage = $message;
         $this->driver = $driver;
     }
 
     /** Получить входящее сообщение.
+     * @deprecated используйте свойство $this->message напрямую
      * @return IncomingMessage
      */
     protected function message(): IncomingMessage
     {
-        return $this->incomingMessage;
+        return $this->message;
     }
 
     /** Получить данные пользователя из входящего сообщения.

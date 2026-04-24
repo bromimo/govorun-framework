@@ -41,6 +41,28 @@ class ControllerTest extends TestCase
         $this->assertSame($msg, $controller->test());
     }
 
+    public function test_message_property_returns_incoming_message(): void
+    {
+        $driver = $this->createMock(MessengerDriver::class);
+        $msg = $this->makeMessage('Привет');
+        $controller = new class extends Controller {
+            public function test(): IncomingMessage { return $this->message; }
+        };
+        $controller->setContext($msg, $driver);
+        $this->assertSame($msg, $controller->test());
+    }
+
+    public function test_message_property_exposes_user_first_name(): void
+    {
+        $driver = $this->createMock(MessengerDriver::class);
+        $msg = $this->makeMessage();
+        $controller = new class extends Controller {
+            public function test(): ?string { return $this->message->user->firstName; }
+        };
+        $controller->setContext($msg, $driver);
+        $this->assertSame('Ivan', $controller->test());
+    }
+
     public function test_user_returns_user_dto(): void
     {
         $driver = $this->createMock(MessengerDriver::class);
