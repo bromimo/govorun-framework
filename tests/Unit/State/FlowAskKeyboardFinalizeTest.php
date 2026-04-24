@@ -6,6 +6,7 @@ use Govorun\State\Step;
 use Govorun\State\Flow;
 use Govorun\Tests\TestCase;
 use Govorun\Testing\FakeDriver;
+use Govorun\Messaging\Button;
 use Govorun\Messaging\Keyboard;
 use Govorun\Messaging\ContentType;
 use Govorun\State\FileStateStorage;
@@ -281,10 +282,12 @@ class InlineAskFlow extends Flow
 
     public function pickStep(Step $step): void
     {
-        $step->ask('Выбери', fn () => Keyboard::make()
-            ->button('Да', 'yes')
-            ->button('Нет', 'no')
-        );
+        $step->ask('Выбери', fn () => Keyboard::make()->buttons([
+            [
+                Button::make('Да')->action('yes'),
+                Button::make('Нет')->action('no'),
+            ],
+        ]));
         $step->receive(function (IncomingMessage $message) {
             $this->completeFlow();
         });
@@ -298,9 +301,9 @@ class ReplyAskFlow extends Flow
 
     public function pickStep(Step $step): void
     {
-        $step->ask('Контакт', fn () => Keyboard::reply()
-            ->button('Телефон', requestContact: true)
-        );
+        $step->ask('Контакт', fn () => Keyboard::reply()->buttons([
+            [Button::make('Телефон')->requestContact()],
+        ]));
         $step->receive(fn (IncomingMessage $m) => $this->completeFlow());
     }
 }
@@ -312,9 +315,9 @@ class UrlOnlyAskFlow extends Flow
 
     public function pickStep(Step $step): void
     {
-        $step->ask('Открой', fn () => Keyboard::make()
-            ->button('Сайт', url: 'https://example.com')
-        );
+        $step->ask('Открой', fn () => Keyboard::make()->buttons([
+            [Button::make('Сайт')->url('https://example.com')],
+        ]));
         $step->receive(fn (IncomingMessage $m) => $this->completeFlow());
     }
 }
@@ -326,13 +329,17 @@ class TwoAskFlow extends Flow
 
     public function firstStepStep(Step $step): void
     {
-        $step->ask('Первый', fn () => Keyboard::make()->button('Да', 'yes'));
+        $step->ask('Первый', fn () => Keyboard::make()->buttons([
+            [Button::make('Да')->action('yes')],
+        ]));
         $step->receive(fn (IncomingMessage $m) => $this->nextStep('secondStep'));
     }
 
     public function secondStepStep(Step $step): void
     {
-        $step->ask('Второй', fn () => Keyboard::make()->button('ОК', 'ok'));
+        $step->ask('Второй', fn () => Keyboard::make()->buttons([
+            [Button::make('ОК')->action('ok')],
+        ]));
         $step->receive(fn (IncomingMessage $m) => $this->completeFlow());
     }
 }

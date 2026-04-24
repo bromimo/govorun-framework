@@ -2,17 +2,18 @@
 
 namespace Govorun\Tests\Unit\Drivers\Telegram;
 
-use Govorun\Drivers\Telegram\TelegramDriver;
-use Govorun\Messaging\Keyboard;
-use Govorun\Messaging\Media;
-use Govorun\Messaging\Message;
-use Govorun\Messaging\OutgoingMessage;
-use Govorun\Tests\TestCase;
 use GuzzleHttp\Client;
-use GuzzleHttp\Handler\MockHandler;
-use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
+use Govorun\Tests\TestCase;
+use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Response;
+use Govorun\Messaging\Media;
+use Govorun\Messaging\Button;
+use Govorun\Messaging\Message;
+use Govorun\Messaging\Keyboard;
+use GuzzleHttp\Handler\MockHandler;
+use Govorun\Messaging\OutgoingMessage;
+use Govorun\Drivers\Telegram\TelegramDriver;
 
 class TelegramSendTest extends TestCase
 {
@@ -68,10 +69,10 @@ class TelegramSendTest extends TestCase
         $driver = $this->makeDriver();
         $msg = Message::make('Choose')
             ->keyboard(
-                Keyboard::make()
-                    ->button('A', action: 'a', param: ['id' => '1'])
-                    ->row()
-                    ->button('B', url: 'https://example.com')
+                Keyboard::make()->buttons([
+                    [Button::make('A')->action('a', ['id' => '1'])],
+                    [Button::make('B')->url('https://example.com')],
+                ]),
             );
         $msg->chatId = '100';
 
@@ -91,8 +92,9 @@ class TelegramSendTest extends TestCase
         $driver = $this->makeDriver();
         $msg = Message::make('Send contact')
             ->keyboard(
-                Keyboard::reply()
-                    ->button('Phone', requestContact: true)
+                Keyboard::reply()->buttons([
+                    [Button::make('Phone')->requestContact()],
+                ]),
             );
         $msg->chatId = '100';
 

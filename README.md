@@ -2,6 +2,8 @@
 
 Мульти-мессенджер бот-фреймворк на PHP 8.3+. Позволяет создавать ботов с единым кодом для разных мессенджеров.
 
+> **v2.0.0 (breaking):** `Keyboard::button()` и `->row()` удалены. Используйте `Keyboard::make()->buttons([[Button::make('…')->action('…'), …], …])`. `Button` создаётся только через `Button::make()` + fluent setters (`->action()`, `->url()`, `->requestContact()`, `->requestLocation()`). `Step::ask()` вторым аргументом принимает `Closure|Keyboard|null` — клавиатуру можно передавать напрямую.
+
 ## Быстрый старт
 
 ```bash
@@ -238,19 +240,25 @@ $msg = Message::make('Текст')
 ### Keyboard
 
 ```php
+use Govorun\Messaging\Button;
 use Govorun\Messaging\Keyboard;
 
 // Inline-клавиатура
-Keyboard::make()
-    ->button('Текст', action: 'name', param: ['key' => 'value'])
-    ->button('Ссылка', url: 'https://example.com')
-    ->row()
-    ->button('Новый ряд');
+Keyboard::make()->buttons([
+    [
+        Button::make('Текст')->action('name', ['key' => 'value']),
+        Button::make('Ссылка')->url('https://example.com'),
+    ],
+    [
+        Button::make('Новый ряд'),
+    ],
+]);
 
 // Reply-клавиатура
-Keyboard::reply()
-    ->button('Контакт', requestContact: true)
-    ->button('Локация', requestLocation: true);
+Keyboard::reply()->buttons([
+    [Button::make('Контакт')->requestContact()],
+    [Button::make('Локация')->requestLocation()],
+]);
 
 // Удалить клавиатуру
 Keyboard::remove();
@@ -269,14 +277,13 @@ Media::voice('https://example.com/audio.ogg');
 ### Button
 
 ```php
-new Button(
-    text: 'Текст кнопки',
-    action: 'callback_action',
-    param: ['key' => 'value'],
-    url: 'https://...',
-    requestContact: false,
-    requestLocation: false,
-);
+use Govorun\Messaging\Button;
+
+Button::make('Текст кнопки')
+    ->action('callback_action', ['key' => 'value'])
+    ->url('https://...')
+    ->requestContact()
+    ->requestLocation();
 ```
 
 ---

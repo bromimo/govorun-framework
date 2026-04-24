@@ -2,10 +2,11 @@
 
 namespace Govorun\Tests\Unit\Messaging;
 
-use Govorun\Messaging\Keyboard;
-use Govorun\Messaging\Message;
-use Govorun\Messaging\OutgoingMessage;
 use Govorun\Tests\TestCase;
+use Govorun\Messaging\Button;
+use Govorun\Messaging\Message;
+use Govorun\Messaging\Keyboard;
+use Govorun\Messaging\OutgoingMessage;
 
 class MessageTest extends TestCase
 {
@@ -20,10 +21,10 @@ class MessageTest extends TestCase
     {
         $msg = Message::make('Выберите действие')
             ->keyboard(
-                Keyboard::make()
-                    ->button('Кнопка', action: 'btn')
-                    ->row()
-                    ->button('Ссылка', url: 'https://example.com')
+                Keyboard::make()->buttons([
+                    [Button::make('Кнопка')->action('btn')],
+                    [Button::make('Ссылка')->url('https://example.com')],
+                ]),
             )
             ->parseMode('markdown');
 

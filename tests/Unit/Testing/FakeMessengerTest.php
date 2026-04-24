@@ -2,15 +2,16 @@
 
 namespace Govorun\Tests\Unit\Testing;
 
-use Govorun\Contracts\MessengerDriver;
-use Govorun\Foundation\Application;
-use Govorun\Messaging\Keyboard;
-use Govorun\Messaging\Message;
-use Govorun\Routing\Controller;
 use Govorun\Routing\Route;
-use Govorun\Testing\FakeDriver;
-use Govorun\Testing\FakeMessenger;
 use PHPUnit\Framework\TestCase;
+use Govorun\Routing\Controller;
+use Govorun\Testing\FakeDriver;
+use Govorun\Messaging\Button;
+use Govorun\Messaging\Message;
+use Govorun\Messaging\Keyboard;
+use Govorun\Testing\FakeMessenger;
+use Govorun\Foundation\Application;
+use Govorun\Contracts\MessengerDriver;
 
 class FakeMessengerTest extends TestCase
 {
@@ -186,9 +187,12 @@ class FakeMessengerTestMenuController extends Controller
     {
         $msg = Message::make('Choose:')
             ->keyboard(
-                Keyboard::make()
-                    ->button('Option A', 'pick', ['v' => 'A'])
-                    ->button('Option B', 'pick', ['v' => 'B'])
+                Keyboard::make()->buttons([
+                    [
+                        Button::make('Option A')->action('pick', ['v' => 'A']),
+                        Button::make('Option B')->action('pick', ['v' => 'B']),
+                    ],
+                ]),
             );
         $this->send($msg);
     }

@@ -2,6 +2,7 @@
 
 namespace Govorun\State;
 
+use Closure;
 use Govorun\Messaging\Message;
 use Govorun\Support\Validator;
 use Govorun\Messaging\Keyboard;
@@ -231,8 +232,12 @@ abstract class Flow
             return;
         }
 
-        $askCallback = $step->getAskCallback();
-        $keyboard = $askCallback?->call($this);
+        $askArg = $step->getAskCallback();
+        $keyboard = match (true) {
+            $askArg instanceof Keyboard => $askArg,
+            $askArg instanceof Closure => $askArg->call($this),
+            default => null,
+        };
 
         $msg = $ask instanceof OutgoingMessage ? $ask : Message::make($ask);
         $msg->chatId = $this->chatId;
