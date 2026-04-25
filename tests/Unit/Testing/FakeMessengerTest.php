@@ -171,6 +171,25 @@ class FakeMessengerTest extends TestCase
             ->receive('/echo_chat')
             ->assertReply('chat-42');
     }
+
+    public function test_click_button_finalizes_inline_keyboard(): void
+    {
+        Route::command('vote', FakeMessengerTestVoteController::class);
+        Route::action('vote_yes', FakeMessengerTestVoteYesController::class);
+        Route::action('vote_no', FakeMessengerTestVoteNoController::class);
+
+        $this->messenger()
+            ->receive('/vote')
+            ->assertReply('Голосуем?')
+            ->clickButton('Да')
+            ->assertReply('Спасибо за «да»');
+
+        $edited = $this->driver->getEditedMessages();
+        $this->assertCount(1, $edited);
+        $this->assertSame('1', $edited[0]['messageId']);
+        $this->assertSame("Голосуем?\n\n(выбрано: Да)", $edited[0]['message']->text);
+        $this->assertNull($edited[0]['message']->keyboard);
+    }
 }
 
 class FakeMessengerTestStartController extends Controller
@@ -211,5 +230,39 @@ class FakeMessengerTestEchoChatController extends Controller
     public function handle(): void
     {
         $this->reply($this->message()->chatId);
+    }
+}
+
+class FakeMessengerTestVoteController extends Controller
+{
+    public function handle(): void
+    {
+        $this->send(
+            Message::make('Голосуем?')
+                ->keyboard(
+                    Keyboard::make()->buttons([
+                        [
+                            Button::make('Да')->action('vote_yes'),
+                            Button::make('Нет')->action('vote_no'),
+                        ],
+                    ]),
+                ),
+        );
+    }
+}
+
+class FakeMessengerTestVoteYesController extends Controller
+{
+    public function handle(): void
+    {
+        $this->reply('Спасибо за «да»');
+    }
+}
+
+class FakeMessengerTestVoteNoController extends Controller
+{
+    public function handle(): void
+    {
+        $this->reply('Спасибо за «нет»');
     }
 }

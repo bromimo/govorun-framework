@@ -5,6 +5,7 @@ namespace Govorun\Routing;
 use Govorun\State\Flow;
 use Govorun\Messaging\Message;
 use Govorun\Messaging\Dto\UserDto;
+use Govorun\Messaging\ContentType;
 use Govorun\Contracts\StateStorage;
 use Govorun\Contracts\MessengerDriver;
 use Govorun\Messaging\IncomingMessage;
@@ -24,6 +25,8 @@ abstract class Controller
     /** Установить контекст выполнения контроллера.
      * Выставляет оба свойства — $message (рекомендуемое, симметрично с Flow)
      * и $incomingMessage (deprecated-алиас для обратной совместимости).
+     * При входящем Action-сообщении автоматически финализирует ранее отправленную
+     * inline-клавиатуру (редактирует исходное сообщение и убирает клавиатуру).
      * @param IncomingMessage $message Входящее сообщение
      * @param MessengerDriver $driver Драйвер мессенджера
      * @return void
@@ -33,6 +36,10 @@ abstract class Controller
         $this->message = $message;
         $this->incomingMessage = $message;
         $this->driver = $driver;
+
+        if ($message->type === ContentType::Action) {
+            $this->finalizeKeyboardContext($message->action);
+        }
     }
 
     /** Получить входящее сообщение.
@@ -64,13 +71,16 @@ abstract class Controller
     }
 
     /** Отправить исходящее сообщение в чат.
+     * При наличии inline-клавиатуры с action-кнопками сохраняет контекст
+     * для последующего автоматического удаления при нажатии кнопки.
      * @param OutgoingMessage $message Исходящее сообщение
      * @return void
      */
     protected function send(OutgoingMessage $message): void
     {
         $message->chatId = $this->incomingMessage->chatId;
-        $this->driver->send($message);
+        $sentId = $this->driver->send($message);
+        $this->captureKeyboardContext($sentId, $message);
     }
 
     /** Редактировать ранее отправленное сообщение (заглушка).
@@ -132,5 +142,152 @@ abstract class Controller
         }
 
         return app(\Govorun\Contracts\StateStorage::class);
+    }
+
+    /** Получить хранилище состояний без выбрасывания исключений.
+     * Возвращает null, если хранилище недоступно (например, в тестах
+     * без bootstrap'а Application и без ручной установки через setStateStorage).
+     * @return StateStorage|null
+     */
+    private function tryStateStorage(): ?StateStorage
+    {
+        if ($this->stateStorage !== null) {
+            return $this->stateStorage;
+        }
+
+        try {
+            return app(\Govorun\Contracts\StateStorage::class);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /** Сохранить контекст inline-клавиатуры для последующего finalize.
+     * Пишет только при не-null message_id, inline-режиме и наличии хотя бы
+     * одной action-кнопки. Для reply/url/remove-клавиатур — no-op.
+     * @param ?string $messageId Идентификатор отправленного сообщения
+     * @param OutgoingMessage $message Отправленное сообщение
+     * @return void
+     */
+    private function captureKeyboardContext(?string $messageId, OutgoingMessage $message): void
+    {
+        if ($messageId === null || $message->keyboard === null) {
+            return;
+        }
+
+        $kb = $message->keyboard;
+
+        if ($kb['type'] !== 'inline' || $kb['remove']) {
+            return;
+        }
+
+        $labelMap = [];
+
+        foreach ($kb['rows'] as $row) {
+            foreach ($row as $btn) {
+                if (isset($btn['action'])) {
+                    $labelMap[$btn['action']] = $btn['text'];
+                }
+            }
+        }
+
+        if (empty($labelMap)) {
+            return;
+        }
+
+        $storage = $this->tryStateStorage();
+
+        if ($storage === null) {
+            return;
+        }
+
+        try {
+            $existing = $storage->get($this->incomingMessage->chatId, $this->incomingMessage->driverName) ?? [];
+            $existing['controller_kb_ctx'] = [
+                'message_id' => $messageId,
+                'original_text' => $message->text ?? '',
+                'parse_mode' => $message->parseMode,
+                'label_map' => $labelMap,
+            ];
+            $storage->set($this->incomingMessage->chatId, $this->incomingMessage->driverName, $existing);
+        } catch (\Throwable) {
+            // Ошибка хранилища не должна ронять отправку сообщения.
+        }
+    }
+
+    /** Финализировать активную inline-клавиатуру: отредактировать исходное
+     * сообщение (убрать клавиатуру, дописать «(выбрано: X)») и очистить контекст.
+     * @param ?string $action Action нажатой кнопки
+     * @return void
+     */
+    private function finalizeKeyboardContext(?string $action): void
+    {
+        $storage = $this->tryStateStorage();
+
+        if ($storage === null) {
+            return;
+        }
+
+        try {
+            $record = $storage->get($this->incomingMessage->chatId, $this->incomingMessage->driverName);
+        } catch (\Throwable) {
+            return;
+        }
+
+        if ($record === null || ! isset($record['controller_kb_ctx'])) {
+            return;
+        }
+
+        $ctx = $record['controller_kb_ctx'];
+
+        if ($action === null || $action === '') {
+            $this->clearKeyboardContext($storage);
+
+            return;
+        }
+
+        $label = $ctx['label_map'][$action] ?? $action;
+        $msg = Message::make($ctx['original_text']."\n\n(выбрано: {$label})");
+        $msg->chatId = $this->incomingMessage->chatId;
+
+        if ($ctx['parse_mode'] !== null) {
+            $msg->parseMode($ctx['parse_mode']);
+        }
+
+        try {
+            $this->driver->edit($ctx['message_id'], $msg);
+        } catch (\Throwable) {
+            // Мёртвый edit не должен ронять обработку action-сообщения.
+        }
+
+        $this->clearKeyboardContext($storage);
+    }
+
+    /** Удалить controller_kb_ctx из стораджа, сохранив остальные поля записи.
+     * Если после удаления запись становится пустой — удалить запись целиком.
+     * @param StateStorage $storage Хранилище состояний
+     * @return void
+     */
+    private function clearKeyboardContext(StateStorage $storage): void
+    {
+        try {
+            $record = $storage->get($this->incomingMessage->chatId, $this->incomingMessage->driverName);
+
+            if ($record === null) {
+                return;
+            }
+
+            unset($record['controller_kb_ctx']);
+
+            if (empty($record)) {
+                $storage->delete($this->incomingMessage->chatId, $this->incomingMessage->driverName);
+
+                return;
+            }
+
+            $storage->set($this->incomingMessage->chatId, $this->incomingMessage->driverName, $record);
+        } catch (\Throwable) {
+            // Ошибка хранилища не должна ломать пользовательский флоу.
+        }
     }
 }
