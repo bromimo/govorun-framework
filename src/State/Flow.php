@@ -304,11 +304,12 @@ abstract class Flow
             'label_map' => $labelMap,
         ]);
 
-        $this->storage->set($this->chatId, $this->driverName, [
-            'flow_class' => static::class,
-            'current_step' => $this->currentStepName(),
-            'data' => $this->state->all(),
-        ]);
+        $existing = $this->storage->get($this->chatId, $this->driverName) ?? [];
+        $existing['flow_class'] = static::class;
+        $existing['current_step'] = $this->currentStepName();
+        $existing['data'] = $this->state->all();
+
+        $this->storage->set($this->chatId, $this->driverName, $existing);
     }
 
     /** Завершить активную ask_keyboard: редактировать исходное сообщение (убрать клавиатуру,
@@ -363,11 +364,8 @@ abstract class Flow
         $record = $this->storage->get($this->chatId, $this->driverName);
 
         if ($record !== null) {
-            $this->storage->set($this->chatId, $this->driverName, [
-                'flow_class' => $record['flow_class'],
-                'current_step' => $record['current_step'],
-                'data' => $data,
-            ]);
+            $record['data'] = $data;
+            $this->storage->set($this->chatId, $this->driverName, $record);
         }
     }
 
@@ -389,11 +387,12 @@ abstract class Flow
      */
     private function saveState(string $currentStep): void
     {
-        $this->storage->set($this->chatId, $this->driverName, [
-            'flow_class' => static::class,
-            'current_step' => $currentStep,
-            'data' => $this->state->all(),
-        ]);
+        $existing = $this->storage->get($this->chatId, $this->driverName) ?? [];
+        $existing['flow_class'] = static::class;
+        $existing['current_step'] = $currentStep;
+        $existing['data'] = $this->state->all();
+
+        $this->storage->set($this->chatId, $this->driverName, $existing);
     }
 
     /** Загрузить данные состояния из хранилища.

@@ -39,7 +39,8 @@ class FlowHandler
         $flowClass = $stateRecord['flow_class'] ?? null;
 
         if ($flowClass === null || ! class_exists($flowClass)) {
-            $this->storage->delete($message->chatId, $message->driverName);
+            // Запись принадлежит контроллеру (например, controller_kb_ctx) — не удаляем,
+            // даём роутеру задиспатчить сообщение в обычном порядке.
             return false;
         }
 
