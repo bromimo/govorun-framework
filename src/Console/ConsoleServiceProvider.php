@@ -43,6 +43,7 @@ class ConsoleServiceProvider extends ServiceProvider
             new MakeApiClientCommand(),
             new StateClearCommand(),
             new TestCommand(),
+            new ProfileSyncCommand(),
         ]);
     }
 }
