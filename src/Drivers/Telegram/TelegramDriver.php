@@ -521,6 +521,87 @@ class TelegramDriver implements MessengerDriver
         );
     }
 
+    /** Установить отображаемое имя бота (Bot API setMyName).
+     * @param string $name Имя бота, до 64 символов; пустая строка — сброс.
+     * @return void
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function setMyName(string $name): void
+    {
+        $this->apiCall('setMyName', ['name' => $name]);
+    }
+
+    /** Установить длинное описание бота (Bot API setMyDescription).
+     * @param string $description До 512 символов; пустая строка — сброс.
+     * @return void
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function setMyDescription(string $description): void
+    {
+        $this->apiCall('setMyDescription', ['description' => $description]);
+    }
+
+    /** Установить короткое about бота (Bot API setMyShortDescription).
+     * @param string $shortDescription До 120 символов; пустая строка — сброс.
+     * @return void
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function setMyShortDescription(string $shortDescription): void
+    {
+        $this->apiCall('setMyShortDescription', ['short_description' => $shortDescription]);
+    }
+
+    /** Установить список команд для меню `/` бота (Bot API setMyCommands).
+     * @param array<int, array{command: string, description: string}> $commands
+     * @return void
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function setMyCommands(array $commands): void
+    {
+        $this->apiCall('setMyCommands', ['commands' => $commands]);
+    }
+
+    /** Установить аватар бота (Bot API setMyProfilePhoto).
+     * @param string $filePath Полный путь к файлу JPG (static) или MP4 (animated).
+     * @param string $type Тип аватара: 'static' или 'animated'.
+     * @return void
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws \RuntimeException Если файл не найден.
+     */
+    public function setMyProfilePhoto(string $filePath, string $type): void
+    {
+        if (! is_file($filePath)) {
+            throw new \RuntimeException("Profile photo file not found: {$filePath}");
+        }
+
+        $inputProfilePhoto = ['type' => $type, 'photo' => 'attach://photo_file'];
+
+        $multipart = [
+            [
+                'name' => 'photo',
+                'contents' => json_encode($inputProfilePhoto),
+            ],
+            [
+                'name' => 'photo_file',
+                'contents' => fopen($filePath, 'rb'),
+                'filename' => basename($filePath),
+            ],
+        ];
+
+        $this->client->request('POST', $this->apiUrl('setMyProfilePhoto'), [
+            'multipart' => $multipart,
+        ]);
+    }
+
+    /** Удалить аватар бота (Bot API removeMyProfilePhoto).
+     * @return void
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function removeMyProfilePhoto(): void
+    {
+        $this->apiCall('removeMyProfilePhoto', []);
+    }
+
     /** Сформировать полный URL метода Telegram Bot API.
      * @param string $method Метод API
      * @return string Полный URL
