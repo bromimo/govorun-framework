@@ -531,6 +531,26 @@ class TelegramDriver implements MessengerDriver
         $this->apiCall('setMyName', ['name' => $name]);
     }
 
+    /** Установить длинное описание бота (Bot API setMyDescription).
+     * @param string $description До 512 символов; пустая строка — сброс.
+     * @return void
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function setMyDescription(string $description): void
+    {
+        $this->apiCall('setMyDescription', ['description' => $description]);
+    }
+
+    /** Установить короткое about бота (Bot API setMyShortDescription).
+     * @param string $shortDescription До 120 символов; пустая строка — сброс.
+     * @return void
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function setMyShortDescription(string $shortDescription): void
+    {
+        $this->apiCall('setMyShortDescription', ['short_description' => $shortDescription]);
+    }
+
     /** Сформировать полный URL метода Telegram Bot API.
      * @param string $method Метод API
      * @return string Полный URL

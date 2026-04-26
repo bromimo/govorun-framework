@@ -44,4 +44,30 @@ class TelegramProfileTest extends TestCase
         $body = json_decode($request->getBody()->getContents(), true);
         $this->assertSame('Govorun Bot', $body['name']);
     }
+
+    public function test_set_my_description_calls_api(): void
+    {
+        $driver = $this->makeDriver();
+
+        $driver->setMyDescription('Длинное описание для пустого экрана.');
+
+        $request = $this->history[0]['request'];
+        $this->assertStringEndsWith('/setMyDescription', $request->getUri()->getPath());
+
+        $body = json_decode($request->getBody()->getContents(), true);
+        $this->assertSame('Длинное описание для пустого экрана.', $body['description']);
+    }
+
+    public function test_set_my_short_description_calls_api(): void
+    {
+        $driver = $this->makeDriver();
+
+        $driver->setMyShortDescription('AI-ассистент');
+
+        $request = $this->history[0]['request'];
+        $this->assertStringEndsWith('/setMyShortDescription', $request->getUri()->getPath());
+
+        $body = json_decode($request->getBody()->getContents(), true);
+        $this->assertSame('AI-ассистент', $body['short_description']);
+    }
 }
