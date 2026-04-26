@@ -10,6 +10,7 @@ use GuzzleHttp\Psr7\Response;
 use GuzzleHttp\Handler\MockHandler;
 use Govorun\Drivers\Telegram\TelegramDriver;
 
+/** Тесты методов синхронизации профиля Telegram-бота (setMyName и др.). */
 class TelegramProfileTest extends TestCase
 {
     private array $history = [];
