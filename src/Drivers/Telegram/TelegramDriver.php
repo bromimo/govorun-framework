@@ -521,6 +521,16 @@ class TelegramDriver implements MessengerDriver
         );
     }
 
+    /** Установить отображаемое имя бота (Bot API setMyName).
+     * @param string $name Имя бота, до 64 символов; пустая строка — сброс.
+     * @return void
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function setMyName(string $name): void
+    {
+        $this->apiCall('setMyName', ['name' => $name]);
+    }
+
     /** Сформировать полный URL метода Telegram Bot API.
      * @param string $method Метод API
      * @return string Полный URL
