@@ -70,4 +70,33 @@ class TelegramProfileTest extends TestCase
         $body = json_decode($request->getBody()->getContents(), true);
         $this->assertSame('AI-ассистент', $body['short_description']);
     }
+
+    public function test_set_my_commands_calls_api(): void
+    {
+        $driver = $this->makeDriver();
+
+        $driver->setMyCommands([
+            ['command' => 'start', 'description' => 'Запустить'],
+            ['command' => 'help',  'description' => 'Справка'],
+        ]);
+
+        $request = $this->history[0]['request'];
+        $this->assertStringEndsWith('/setMyCommands', $request->getUri()->getPath());
+
+        $body = json_decode($request->getBody()->getContents(), true);
+        $this->assertSame([
+            ['command' => 'start', 'description' => 'Запустить'],
+            ['command' => 'help',  'description' => 'Справка'],
+        ], $body['commands']);
+    }
+
+    public function test_set_my_commands_with_empty_array_clears_menu(): void
+    {
+        $driver = $this->makeDriver();
+
+        $driver->setMyCommands([]);
+
+        $body = json_decode($this->history[0]['request']->getBody()->getContents(), true);
+        $this->assertSame([], $body['commands']);
+    }
 }

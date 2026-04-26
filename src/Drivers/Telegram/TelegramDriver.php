@@ -551,6 +551,16 @@ class TelegramDriver implements MessengerDriver
         $this->apiCall('setMyShortDescription', ['short_description' => $shortDescription]);
     }
 
+    /** Установить список команд для меню `/` бота (Bot API setMyCommands).
+     * @param array<int, array{command: string, description: string}> $commands
+     * @return void
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function setMyCommands(array $commands): void
+    {
+        $this->apiCall('setMyCommands', ['commands' => $commands]);
+    }
+
     /** Сформировать полный URL метода Telegram Bot API.
      * @param string $method Метод API
      * @return string Полный URL
