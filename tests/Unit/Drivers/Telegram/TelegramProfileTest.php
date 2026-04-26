@@ -99,4 +99,43 @@ class TelegramProfileTest extends TestCase
         $body = json_decode($this->history[0]['request']->getBody()->getContents(), true);
         $this->assertSame([], $body['commands']);
     }
+
+    public function test_set_my_profile_photo_static_uses_multipart(): void
+    {
+        $driver = $this->makeDriver();
+        $photo = __DIR__ . '/../../../fixtures/profile-photo.jpg';
+
+        $driver->setMyProfilePhoto($photo, 'static');
+
+        $request = $this->history[0]['request'];
+        $this->assertStringEndsWith('/setMyProfilePhoto', $request->getUri()->getPath());
+        $this->assertStringContainsString('multipart/form-data', $request->getHeaderLine('Content-Type'));
+
+        $body = (string) $request->getBody();
+        $this->assertStringContainsString('name="photo"', $body);
+        $this->assertStringContainsString('"type":"static"', $body);
+        $this->assertStringContainsString('"photo":"attach:\/\/photo_file"', $body);
+        $this->assertStringContainsString('name="photo_file"', $body);
+    }
+
+    public function test_set_my_profile_photo_animated_passes_type(): void
+    {
+        $driver = $this->makeDriver();
+        $photo = __DIR__ . '/../../../fixtures/profile-photo.jpg';
+
+        $driver->setMyProfilePhoto($photo, 'animated');
+
+        $body = (string) $this->history[0]['request']->getBody();
+        $this->assertStringContainsString('"type":"animated"', $body);
+    }
+
+    public function test_remove_my_profile_photo_calls_api(): void
+    {
+        $driver = $this->makeDriver();
+
+        $driver->removeMyProfilePhoto();
+
+        $request = $this->history[0]['request'];
+        $this->assertStringEndsWith('/removeMyProfilePhoto', $request->getUri()->getPath());
+    }
 }
