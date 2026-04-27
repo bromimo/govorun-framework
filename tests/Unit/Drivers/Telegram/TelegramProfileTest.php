@@ -165,4 +165,37 @@ class TelegramProfileTest extends TestCase
 
         $driver->setMyName('Boom');
     }
+
+    public function test_429_includes_human_readable_retry_after(): void
+    {
+        $driver = $this->makeDriver([
+            new Response(429, [], '{"ok":false,"error_code":429,"description":"Too Many Requests","parameters":{"retry_after":80055}}'),
+        ]);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('повторить через 22ч 14мин');
+
+        $driver->setMyName('Test');
+    }
+
+    public function test_get_my_name_returns_value(): void
+    {
+        $driver = $this->makeDriver([
+            new Response(200, [], '{"ok":true,"result":{"name":"Existing Name"}}'),
+        ]);
+
+        $this->assertSame('Existing Name', $driver->getMyName());
+    }
+
+    public function test_get_my_commands_normalizes_response(): void
+    {
+        $driver = $this->makeDriver([
+            new Response(200, [], '{"ok":true,"result":[{"command":"start","description":"S"},{"command":"help","description":"H"}]}'),
+        ]);
+
+        $this->assertSame([
+            ['command' => 'start', 'description' => 'S'],
+            ['command' => 'help', 'description' => 'H'],
+        ], $driver->getMyCommands());
+    }
 }
