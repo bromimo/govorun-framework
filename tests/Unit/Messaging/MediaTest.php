@@ -62,4 +62,18 @@ class MediaTest extends TestCase
         $msg = Media::video('https://example.com/clip.mp4')->caption('Описание');
         $this->assertSame('Описание', $msg->text);
     }
+
+    public function test_audio_creates_outgoing_message(): void
+    {
+        $msg = Media::audio('https://example.com/track.mp3');
+        $this->assertSame('audio', $msg->media['type']);
+        $this->assertSame('https://example.com/track.mp3', $msg->media['url']);
+    }
+
+    public function test_animation_creates_outgoing_message(): void
+    {
+        $msg = Media::animation('https://example.com/animated.gif');
+        $this->assertSame('animation', $msg->media['type']);
+        $this->assertSame('https://example.com/animated.gif', $msg->media['url']);
+    }
 }

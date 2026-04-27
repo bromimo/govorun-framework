@@ -52,4 +52,28 @@ class Media
 
         return $msg;
     }
+
+    /** Создать исходящее сообщение с аудиозаписью.
+     * @param string $url URL-адрес аудиофайла.
+     * @return OutgoingMessage
+     */
+    public static function audio(string $url): OutgoingMessage
+    {
+        $msg = new OutgoingMessage();
+        $msg->media = ['type' => 'audio', 'url' => $url];
+
+        return $msg;
+    }
+
+    /** Создать исходящее сообщение с анимацией (GIF).
+     * @param string $url URL-адрес анимации.
+     * @return OutgoingMessage
+     */
+    public static function animation(string $url): OutgoingMessage
+    {
+        $msg = new OutgoingMessage();
+        $msg->media = ['type' => 'animation', 'url' => $url];
+
+        return $msg;
+    }
 }
