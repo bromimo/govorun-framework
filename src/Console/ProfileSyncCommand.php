@@ -52,8 +52,11 @@ class ProfileSyncCommand extends Command
 
         foreach ($sections as $section) {
             try {
-                $this->syncSection($driver, $section, $profile);
-                $this->info("✓ {$section}");
+                if ($this->syncSection($driver, $section, $profile)) {
+                    $this->info("✓ {$section}");
+                } else {
+                    $this->line("∘ {$section} (без изменений)");
+                }
             } catch (Throwable $e) {
                 $errors[$section] = $e->getMessage();
                 $this->error("✗ {$section}: {$e->getMessage()}");
@@ -114,37 +117,110 @@ class ProfileSyncCommand extends Command
      * @param TelegramDriver $driver
      * @param string $section
      * @param array<string, mixed> $profile
-     * @return void
+     * @return bool true если был вызван set-API, false если значение совпало и пропустили.
      */
-    private function syncSection(TelegramDriver $driver, string $section, array $profile): void
+    private function syncSection(TelegramDriver $driver, string $section, array $profile): bool
     {
-        match ($section) {
-            'name'              => $driver->setMyName((string) ($profile['name'] ?? '')),
-            'short_description' => $driver->setMyShortDescription((string) ($profile['short_description'] ?? '')),
-            'description'       => $driver->setMyDescription((string) ($profile['description'] ?? '')),
-            'commands'          => $driver->setMyCommands($profile['commands'] ?? []),
+        return match ($section) {
+            'name'              => $this->syncName($driver, (string) ($profile['name'] ?? '')),
+            'short_description' => $this->syncShortDescription($driver, (string) ($profile['short_description'] ?? '')),
+            'description'       => $this->syncDescription($driver, (string) ($profile['description'] ?? '')),
+            'commands'          => $this->syncCommands($driver, $profile['commands'] ?? []),
             'photo'             => $this->syncPhoto($driver),
         };
     }
 
-    /** Синхронизировать фото: статичное → animated → отсутствие → removeMyProfilePhoto.
+    /** Идемпотентно установить имя бота: пропустить если совпадает.
      * @param TelegramDriver $driver
-     * @return void
+     * @param string $desired
+     * @return bool true если пушили, false если пропустили.
      */
-    private function syncPhoto(TelegramDriver $driver): void
+    private function syncName(TelegramDriver $driver, string $desired): bool
+    {
+        if ($driver->getMyName() === $desired) {
+            return false;
+        }
+
+        $driver->setMyName($desired);
+
+        return true;
+    }
+
+    /** Идемпотентно установить short_description.
+     * @param TelegramDriver $driver
+     * @param string $desired
+     * @return bool
+     */
+    private function syncShortDescription(TelegramDriver $driver, string $desired): bool
+    {
+        if ($driver->getMyShortDescription() === $desired) {
+            return false;
+        }
+
+        $driver->setMyShortDescription($desired);
+
+        return true;
+    }
+
+    /** Идемпотентно установить description.
+     * @param TelegramDriver $driver
+     * @param string $desired
+     * @return bool
+     */
+    private function syncDescription(TelegramDriver $driver, string $desired): bool
+    {
+        if ($driver->getMyDescription() === $desired) {
+            return false;
+        }
+
+        $driver->setMyDescription($desired);
+
+        return true;
+    }
+
+    /** Идемпотентно установить список команд.
+     * @param TelegramDriver $driver
+     * @param array<int, array{command: string, description: string}> $desired
+     * @return bool
+     */
+    private function syncCommands(TelegramDriver $driver, array $desired): bool
+    {
+        $current = $driver->getMyCommands();
+        $desiredNormalized = array_map(
+            fn (array $c) => ['command' => (string) ($c['command'] ?? ''), 'description' => (string) ($c['description'] ?? '')],
+            $desired,
+        );
+
+        if ($current === $desiredNormalized) {
+            return false;
+        }
+
+        $driver->setMyCommands($desired);
+
+        return true;
+    }
+
+    /** Синхронизировать фото: статичное → animated → отсутствие → removeMyProfilePhoto.
+     * Идемпотентность для фото не применяется (Telegram не отдаёт отпечаток текущего файла).
+     * @param TelegramDriver $driver
+     * @return bool Всегда true — пушим каждый раз.
+     */
+    private function syncPhoto(TelegramDriver $driver): bool
     {
         $jpgPath = storage_path('app/bot-profile.jpg');
         if (is_file($jpgPath)) {
             $driver->setMyProfilePhoto($jpgPath, 'static');
-            return;
+            return true;
         }
 
         $mp4Path = storage_path('app/bot-profile.mp4');
         if (is_file($mp4Path)) {
             $driver->setMyProfilePhoto($mp4Path, 'animated');
-            return;
+            return true;
         }
 
         $driver->removeMyProfilePhoto();
+
+        return true;
     }
 }

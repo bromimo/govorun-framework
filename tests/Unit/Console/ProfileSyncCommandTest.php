@@ -45,6 +45,10 @@ class ProfileSyncCommandTest extends TestCase
     public function test_sync_calls_all_text_methods(): void
     {
         $driver = $this->bindDriver();
+        $driver->method('getMyName')->willReturn('');
+        $driver->method('getMyShortDescription')->willReturn('');
+        $driver->method('getMyDescription')->willReturn('');
+        $driver->method('getMyCommands')->willReturn([]);
         $driver->expects($this->once())->method('setMyName')->with('Test Bot');
         $driver->expects($this->once())->method('setMyShortDescription')->with('About test');
         $driver->expects($this->once())->method('setMyDescription')->with('Long description for test');
@@ -61,6 +65,32 @@ class ProfileSyncCommandTest extends TestCase
         $text = $output->fetch();
         $this->assertSame(0, $exitCode, $text);
         $this->assertStringContainsString('✓ name', $text);
+    }
+
+    public function test_sync_skips_set_when_value_unchanged(): void
+    {
+        $driver = $this->bindDriver();
+        $driver->method('getMyName')->willReturn('Test Bot');
+        $driver->method('getMyShortDescription')->willReturn('About test');
+        $driver->method('getMyDescription')->willReturn('Long description for test');
+        $driver->method('getMyCommands')->willReturn([
+            ['command' => 'start', 'description' => 'Start the bot'],
+            ['command' => 'help',  'description' => 'Show help'],
+        ]);
+        $driver->expects($this->never())->method('setMyName');
+        $driver->expects($this->never())->method('setMyShortDescription');
+        $driver->expects($this->never())->method('setMyDescription');
+        $driver->expects($this->never())->method('setMyCommands');
+        $driver->expects($this->once())->method('removeMyProfilePhoto');
+
+        $artisan = $this->app->make('artisan');
+        $output = new BufferedOutput();
+        $exitCode = $artisan->run(new ArrayInput(['command' => 'bot:profile-sync']), $output);
+
+        $text = $output->fetch();
+        $this->assertSame(0, $exitCode, $text);
+        $this->assertStringContainsString('∘ name (без изменений)', $text);
+        $this->assertStringContainsString('∘ commands (без изменений)', $text);
     }
 
     public function test_sync_skip_photo_does_not_touch_photo(): void

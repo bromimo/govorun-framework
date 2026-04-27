@@ -468,6 +468,7 @@ class TelegramDriver implements MessengerDriver
     {
         $response = $this->client->request('POST', $this->apiUrl($method), [
             'json' => $payload,
+            'http_errors' => false,
         ]);
 
         $body = $response->getBody()->getContents();
@@ -492,10 +493,37 @@ class TelegramDriver implements MessengerDriver
         if (($decoded['ok'] ?? false) !== true) {
             $description = $decoded['description'] ?? 'unknown error';
             $errorCode = $decoded['error_code'] ?? 0;
-            throw new \RuntimeException("Telegram {$method} failed [{$errorCode}]: {$description}");
+            $msg = "Telegram {$method} failed [{$errorCode}]: {$description}";
+
+            $retryAfter = $decoded['parameters']['retry_after'] ?? null;
+            if (is_int($retryAfter) && $retryAfter > 0) {
+                $msg .= " (повторить через {$this->formatRetryAfter($retryAfter)})";
+            }
+
+            throw new \RuntimeException($msg);
         }
 
         return $decoded;
+    }
+
+    /** Отформатировать retry_after в человекочитаемый вид.
+     * @param int $seconds Секунды до возможного повтора.
+     * @return string Например, «22ч 14мин» или «5мин».
+     */
+    private function formatRetryAfter(int $seconds): string
+    {
+        $hours = intdiv($seconds, 3600);
+        $minutes = intdiv($seconds % 3600, 60);
+
+        if ($hours > 0) {
+            return "{$hours}ч {$minutes}мин";
+        }
+
+        if ($minutes > 0) {
+            return "{$minutes}мин";
+        }
+
+        return "{$seconds}с";
     }
 
     /** Установить вебхук для получения обновлений.
@@ -555,6 +583,54 @@ class TelegramDriver implements MessengerDriver
     public function setMyName(string $name): void
     {
         $this->apiCall('setMyName', ['name' => $name]);
+    }
+
+    /** Получить текущее имя бота (Bot API getMyName).
+     * @return string Текущее имя или пустая строка.
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function getMyName(): string
+    {
+        $result = $this->apiCall('getMyName', []);
+
+        return (string) ($result['result']['name'] ?? '');
+    }
+
+    /** Получить текущее длинное описание бота (Bot API getMyDescription).
+     * @return string Текущее описание или пустая строка.
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function getMyDescription(): string
+    {
+        $result = $this->apiCall('getMyDescription', []);
+
+        return (string) ($result['result']['description'] ?? '');
+    }
+
+    /** Получить текущее короткое about бота (Bot API getMyShortDescription).
+     * @return string Текущее short_description или пустая строка.
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function getMyShortDescription(): string
+    {
+        $result = $this->apiCall('getMyShortDescription', []);
+
+        return (string) ($result['result']['short_description'] ?? '');
+    }
+
+    /** Получить текущий список команд бота (Bot API getMyCommands).
+     * @return array<int, array{command: string, description: string}>
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function getMyCommands(): array
+    {
+        $result = $this->apiCall('getMyCommands', []);
+        $commands = $result['result'] ?? [];
+
+        return array_map(
+            fn (array $c) => ['command' => (string) ($c['command'] ?? ''), 'description' => (string) ($c['description'] ?? '')],
+            $commands,
+        );
     }
 
     /** Установить длинное описание бота (Bot API setMyDescription).
@@ -618,6 +694,7 @@ class TelegramDriver implements MessengerDriver
 
         $response = $this->client->request('POST', $this->apiUrl('setMyProfilePhoto'), [
             'multipart' => $multipart,
+            'http_errors' => false,
         ]);
 
         $this->assertOk('setMyProfilePhoto', $response->getBody()->getContents());
