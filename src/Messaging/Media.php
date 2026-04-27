@@ -40,4 +40,16 @@ class Media
 
         return $msg;
     }
+
+    /** Создать исходящее сообщение с видео.
+     * @param string $url URL-адрес видео.
+     * @return OutgoingMessage
+     */
+    public static function video(string $url): OutgoingMessage
+    {
+        $msg = new OutgoingMessage();
+        $msg->media = ['type' => 'video', 'url' => $url];
+
+        return $msg;
+    }
 }

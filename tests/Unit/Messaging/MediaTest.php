@@ -48,4 +48,18 @@ class MediaTest extends TestCase
         $msg = Media::voice('/path/to/audio.ogg');
         $this->assertNull($msg->text);
     }
+
+    public function test_video_creates_outgoing_message(): void
+    {
+        $msg = Media::video('https://example.com/clip.mp4');
+        $this->assertInstanceOf(OutgoingMessage::class, $msg);
+        $this->assertSame('video', $msg->media['type']);
+        $this->assertSame('https://example.com/clip.mp4', $msg->media['url']);
+    }
+
+    public function test_video_with_caption(): void
+    {
+        $msg = Media::video('https://example.com/clip.mp4')->caption('Описание');
+        $this->assertSame('Описание', $msg->text);
+    }
 }
