@@ -17,11 +17,15 @@ class HandleWebhookTest extends TestCase
 {
     private Application $app;
     private array $sent = [];
+    private string $logFile;
 
     protected function setUp(): void
     {
         parent::setUp();
         Route::clear();
+
+        $this->logFile = sys_get_temp_dir() . '/govorun-test-' . uniqid() . '.log';
+        putenv('GOVORUN_TEST_LOG_PATH=' . $this->logFile);
 
         $this->app = new Application(__DIR__ . '/../../fixtures');
         $this->app->loadConfiguration();
@@ -30,6 +34,16 @@ class HandleWebhookTest extends TestCase
     protected function tearDown(): void
     {
         Route::clear();
+
+        $this->app->flush();
+        Application::setInstance(null);
+        putenv('GOVORUN_TEST_LOG_PATH');
+        gc_collect_cycles();
+
+        if (file_exists($this->logFile)) {
+            @unlink($this->logFile);
+        }
+
         parent::tearDown();
     }
 
@@ -198,11 +212,6 @@ class HandleWebhookTest extends TestCase
         $this->app->registerCoreProviders();
         $this->app->boot();
 
-        $logFile = sys_get_temp_dir() . '/govorun-test.log';
-        if (file_exists($logFile)) {
-            unlink($logFile);
-        }
-
         $message = $this->makeIncomingMessage('/crash');
         $driver = $this->makeFakeDriver($message);
         $this->app->instance(MessengerDriver::class, $driver);
@@ -216,15 +225,8 @@ class HandleWebhookTest extends TestCase
 
         $this->app->handleWebhook($request);
 
-        $this->assertFileExists($logFile);
-        $this->assertStringContainsString('Something went wrong', file_get_contents($logFile));
-
-        // Cleanup
-        $this->app->flush();
-        gc_collect_cycles();
-        if (file_exists($logFile)) {
-            unlink($logFile);
-        }
+        $this->assertFileExists($this->logFile);
+        $this->assertStringContainsString('Something went wrong', file_get_contents($this->logFile));
     }
 }
 

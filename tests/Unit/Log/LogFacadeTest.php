@@ -15,13 +15,11 @@ class LogFacadeTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->logFile = sys_get_temp_dir() . '/govorun-test-' . uniqid() . '.log';
+        putenv('GOVORUN_TEST_LOG_PATH=' . $this->logFile);
+
         $this->app = new Application(dirname(__DIR__, 2) . '/fixtures');
         $this->app->loadConfiguration();
-        $this->logFile = sys_get_temp_dir() . '/govorun-test.log';
-
-        if (file_exists($this->logFile)) {
-            unlink($this->logFile);
-        }
 
         $provider = new LogServiceProvider($this->app);
         $provider->register();
@@ -31,10 +29,11 @@ class LogFacadeTest extends TestCase
     {
         $this->app->flush();
         Application::setInstance(null);
+        putenv('GOVORUN_TEST_LOG_PATH');
         gc_collect_cycles();
 
         if (file_exists($this->logFile)) {
-            unlink($this->logFile);
+            @unlink($this->logFile);
         }
         parent::tearDown();
     }
