@@ -20,7 +20,7 @@ class RouteTest extends TestCase
         $routes = Route::getRoutes();
         $this->assertCount(1, $routes);
         $this->assertSame('command', $routes[0]->type);
-        $this->assertSame('start', $routes[0]->value);
+        $this->assertSame('/start', $routes[0]->value);
         $this->assertSame('StartController', $routes[0]->action);
     }
 
