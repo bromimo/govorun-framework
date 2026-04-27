@@ -462,6 +462,7 @@ class TelegramDriver implements MessengerDriver
      * @param array<string, mixed> $payload Данные запроса
      * @return array<string, mixed> Ответ API
      * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws \RuntimeException Если Telegram вернул ok=false.
      */
     private function apiCall(string $method, array $payload): array
     {
@@ -469,7 +470,32 @@ class TelegramDriver implements MessengerDriver
             'json' => $payload,
         ]);
 
-        return json_decode($response->getBody()->getContents(), true) ?? [];
+        $body = $response->getBody()->getContents();
+
+        return $this->assertOk($method, $body);
+    }
+
+    /** Распарсить ответ Bot API и убедиться что ok=true; иначе бросить RuntimeException.
+     * @param string $method Имя метода для текста ошибки.
+     * @param string $body Сырое тело ответа.
+     * @return array<string, mixed> Декодированный ответ.
+     * @throws \RuntimeException Если ok=false или тело не парсится.
+     */
+    private function assertOk(string $method, string $body): array
+    {
+        $decoded = json_decode($body, true);
+
+        if (! is_array($decoded)) {
+            throw new \RuntimeException("Telegram {$method}: invalid response body — {$body}");
+        }
+
+        if (($decoded['ok'] ?? false) !== true) {
+            $description = $decoded['description'] ?? 'unknown error';
+            $errorCode = $decoded['error_code'] ?? 0;
+            throw new \RuntimeException("Telegram {$method} failed [{$errorCode}]: {$description}");
+        }
+
+        return $decoded;
     }
 
     /** Установить вебхук для получения обновлений.
@@ -566,7 +592,7 @@ class TelegramDriver implements MessengerDriver
      * @param string $type Тип аватара: 'static' или 'animated'.
      * @return void
      * @throws \GuzzleHttp\Exception\GuzzleException
-     * @throws \RuntimeException Если файл не найден.
+     * @throws \RuntimeException Если файл не найден или Telegram вернул ok=false.
      */
     public function setMyProfilePhoto(string $filePath, string $type): void
     {
@@ -574,12 +600,14 @@ class TelegramDriver implements MessengerDriver
             throw new \RuntimeException("Profile photo file not found: {$filePath}");
         }
 
-        $inputProfilePhoto = ['type' => $type, 'photo' => 'attach://photo_file'];
+        $fileField = $type === 'animated' ? 'animation' : 'photo';
+        $inputProfilePhoto = ['type' => $type, $fileField => 'attach://photo_file'];
 
         $multipart = [
             [
                 'name' => 'photo',
                 'contents' => json_encode($inputProfilePhoto),
+                'headers' => ['Content-Type' => 'application/json'],
             ],
             [
                 'name' => 'photo_file',
@@ -588,9 +616,11 @@ class TelegramDriver implements MessengerDriver
             ],
         ];
 
-        $this->client->request('POST', $this->apiUrl('setMyProfilePhoto'), [
+        $response = $this->client->request('POST', $this->apiUrl('setMyProfilePhoto'), [
             'multipart' => $multipart,
         ]);
+
+        $this->assertOk('setMyProfilePhoto', $response->getBody()->getContents());
     }
 
     /** Удалить аватар бота (Bot API removeMyProfilePhoto).
