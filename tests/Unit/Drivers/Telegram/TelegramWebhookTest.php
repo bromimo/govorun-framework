@@ -42,15 +42,16 @@ class TelegramWebhookTest extends TestCase
         $this->assertSame('test-secret', $body['secret_token']);
     }
 
-    public function test_install_webhook_failure(): void
+    public function test_install_webhook_throws_when_api_not_ok(): void
     {
         $driver = $this->makeDriver([
-            new Response(200, [], '{"ok":false}'),
+            new Response(200, [], '{"ok":false,"error_code":400,"description":"bad webhook url"}'),
         ]);
 
-        $result = $driver->installWebhook('https://example.com/webhook/telegram');
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Telegram setWebhook failed [400]: bad webhook url');
 
-        $this->assertFalse($result);
+        $driver->installWebhook('https://example.com/webhook/telegram');
     }
 
     public function test_remove_webhook(): void

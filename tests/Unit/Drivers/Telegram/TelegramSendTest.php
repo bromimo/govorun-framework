@@ -199,17 +199,18 @@ class TelegramSendTest extends TestCase
         $this->assertSame('42', $id);
     }
 
-    public function test_send_returns_null_when_api_not_ok(): void
+    public function test_send_throws_when_api_not_ok(): void
     {
         $driver = $this->makeDriver([
-            new Response(200, [], '{"ok":false,"description":"fail"}'),
+            new Response(200, [], '{"ok":false,"error_code":400,"description":"fail"}'),
         ]);
         $msg = Message::make('Привет');
         $msg->chatId = '100';
 
-        $id = $driver->send($msg);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Telegram sendMessage failed [400]: fail');
 
-        $this->assertNull($id);
+        $driver->send($msg);
     }
 
     public function test_send_media_returns_message_id(): void
