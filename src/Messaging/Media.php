@@ -40,4 +40,40 @@ class Media
 
         return $msg;
     }
+
+    /** Создать исходящее сообщение с видео.
+     * @param string $url URL-адрес видео.
+     * @return OutgoingMessage
+     */
+    public static function video(string $url): OutgoingMessage
+    {
+        $msg = new OutgoingMessage();
+        $msg->media = ['type' => 'video', 'url' => $url];
+
+        return $msg;
+    }
+
+    /** Создать исходящее сообщение с аудиозаписью.
+     * @param string $url URL-адрес аудиофайла.
+     * @return OutgoingMessage
+     */
+    public static function audio(string $url): OutgoingMessage
+    {
+        $msg = new OutgoingMessage();
+        $msg->media = ['type' => 'audio', 'url' => $url];
+
+        return $msg;
+    }
+
+    /** Создать исходящее сообщение с анимацией (GIF).
+     * @param string $url URL-адрес анимации.
+     * @return OutgoingMessage
+     */
+    public static function animation(string $url): OutgoingMessage
+    {
+        $msg = new OutgoingMessage();
+        $msg->media = ['type' => 'animation', 'url' => $url];
+
+        return $msg;
+    }
 }
