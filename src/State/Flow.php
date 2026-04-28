@@ -96,6 +96,15 @@ abstract class Flow
      */
     public function shouldInterrupt(IncomingMessage $message): bool
     {
+        if ($this->state->has('__ask_keyboard_ctx')) {
+            if ($message->type === ContentType::Text) {
+                return true;
+            }
+            if ($message->type === ContentType::Event) {
+                return false;
+            }
+        }
+
         if ($this->interruptOnEvent && $message->type === ContentType::Event) {
             return true;
         }
