@@ -12,6 +12,8 @@ class Keyboard
     private array $rows = [];
     private string $type = 'inline';
     private bool $remove = false;
+    private bool $resize = false;
+    private bool $oneTime = false;
 
     /** Создать новую inline-клавиатуру.
      * @return static
@@ -54,6 +56,28 @@ class Keyboard
         return $this;
     }
 
+    /** Подогнать высоту кнопок под содержимое (только reply).
+     * @param bool $resize Флаг подгонки размера
+     * @return static
+     */
+    public function resize(bool $resize = true): static
+    {
+        $this->resize = $resize;
+
+        return $this;
+    }
+
+    /** Скрыть клавиатуру после нажатия кнопки (только reply).
+     * @param bool $oneTime Флаг одноразовой клавиатуры
+     * @return static
+     */
+    public function oneTime(bool $oneTime = true): static
+    {
+        $this->oneTime = $oneTime;
+
+        return $this;
+    }
+
     /** Преобразовать клавиатуру в массив.
      * @return array<string, mixed>
      */
@@ -62,6 +86,8 @@ class Keyboard
         return [
             'type' => $this->type,
             'remove' => $this->remove,
+            'resize' => $this->resize,
+            'oneTime' => $this->oneTime,
             'rows' => array_map(
                 fn (array $row) => array_map(
                     fn (Button $btn) => $btn->toArray(),
