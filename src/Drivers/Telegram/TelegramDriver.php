@@ -408,7 +408,7 @@ class TelegramDriver implements MessengerDriver
         }
 
         if ($keyboard['type'] === 'reply') {
-            return ['keyboard' => $rows, 'resize_keyboard' => true, 'one_time_keyboard' => true];
+            return ['keyboard' => $rows, 'resize_keyboard' => $keyboard['resize'], 'one_time_keyboard' => $keyboard['oneTime']];
         }
 
         return ['inline_keyboard' => $rows];
