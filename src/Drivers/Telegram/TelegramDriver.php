@@ -341,23 +341,28 @@ class TelegramDriver implements MessengerDriver
     private function sendMedia(OutgoingMessage $message): ?string
     {
         $media = $message->media;
-        $type = $media['type'];
+        $type  = $media['type'];
 
         $methodMap = [
-            'photo' => 'sendPhoto',
-            'document' => 'sendDocument',
-            'voice' => 'sendVoice',
-            'video' => 'sendVideo',
-            'audio' => 'sendAudio',
+            'photo'     => 'sendPhoto',
+            'document'  => 'sendDocument',
+            'voice'     => 'sendVoice',
+            'video'     => 'sendVideo',
+            'audio'     => 'sendAudio',
             'animation' => 'sendAnimation',
-            'sticker' => 'sendSticker',
+            'sticker'   => 'sendSticker',
         ];
 
-        $method = $methodMap[$type] ?? 'sendDocument';
+        $method   = $methodMap[$type] ?? 'sendDocument';
+        $mediaRef = $media['url'];
+
+        if (! str_starts_with($mediaRef, 'http')) {
+            return $this->sendMediaFile($method, $type, $mediaRef, $message);
+        }
 
         $payload = [
             'chat_id' => $message->chatId,
-            $type => $media['url'],
+            $type     => $mediaRef,
         ];
 
         if ($message->text !== null) {
@@ -371,6 +376,42 @@ class TelegramDriver implements MessengerDriver
         $response = $this->apiCall($method, $payload);
 
         return $this->extractMessageId($response);
+    }
+
+    /** Отправить медиафайл из локального пути через multipart form upload.
+     * @param string $method Метод Telegram API (sendPhoto и др.)
+     * @param string $fieldName Имя поля (photo, video и др.)
+     * @param string $filePath Локальный путь к файлу
+     * @param OutgoingMessage $message Исходящее сообщение
+     * @return ?string Идентификатор отправленного сообщения или null
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws \RuntimeException Если файл не существует
+     */
+    private function sendMediaFile(string $method, string $fieldName, string $filePath, OutgoingMessage $message): ?string
+    {
+        if (! is_file($filePath)) {
+            throw new \RuntimeException("Media file not found: {$filePath}");
+        }
+
+        $multipart = [
+            ['name' => 'chat_id', 'contents' => $message->chatId],
+            ['name' => $fieldName, 'contents' => fopen($filePath, 'rb'), 'filename' => basename($filePath)],
+        ];
+
+        if ($message->text !== null) {
+            $multipart[] = ['name' => 'caption', 'contents' => $message->text];
+        }
+
+        if ($message->parseMode !== null) {
+            $multipart[] = ['name' => 'parse_mode', 'contents' => $message->parseMode];
+        }
+
+        $response = $this->client->request('POST', $this->apiUrl($method), [
+            'multipart'   => $multipart,
+            'http_errors' => false,
+        ]);
+
+        return $this->extractMessageId($this->assertOk($method, $response->getBody()->getContents()));
     }
 
     /** Извлечь message_id из ответа Telegram API.

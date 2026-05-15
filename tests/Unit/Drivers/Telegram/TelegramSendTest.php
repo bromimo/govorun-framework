@@ -134,6 +134,26 @@ class TelegramSendTest extends TestCase
         $this->assertSame('Nice photo', $body['caption']);
     }
 
+    public function test_send_photo_from_local_file(): void
+    {
+        // Use the fixtures profile photo as a real local file
+        $filePath = __DIR__ . '/../../../fixtures/profile-photo.jpg';
+        $this->assertFileExists($filePath);
+
+        $driver = $this->makeDriver();
+        $msg = Media::photo($filePath)->caption('Local photo');
+        $msg->chatId = '100';
+
+        $driver->send($msg);
+
+        $request = $this->history[0]['request'];
+        $this->assertStringEndsWith('/sendPhoto', $request->getUri()->getPath());
+
+        // Multipart request — content-type should be multipart/form-data
+        $contentType = $request->getHeaderLine('Content-Type');
+        $this->assertStringContainsString('multipart/form-data', $contentType);
+    }
+
     public function test_send_document(): void
     {
         $driver = $this->makeDriver();
