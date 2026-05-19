@@ -3,10 +3,14 @@
 namespace Govorun\Routing;
 
 use Govorun\State\Flow;
+use Govorun\State\StateData;
 use Govorun\Messaging\Message;
+use Govorun\Http\MakesHttpCalls;
 use Govorun\Messaging\Dto\UserDto;
 use Govorun\Messaging\ContentType;
 use Govorun\Contracts\StateStorage;
+use Govorun\Contracts\StateAccessor;
+use Govorun\State\PersistentState;
 use Govorun\Contracts\MessengerDriver;
 use Govorun\Messaging\IncomingMessage;
 use Govorun\Messaging\OutgoingMessage;
@@ -17,10 +21,13 @@ use Govorun\Messaging\OutgoingMessage;
  */
 abstract class Controller
 {
+    use MakesHttpCalls;
+
     protected IncomingMessage $message;
     protected IncomingMessage $incomingMessage;
     protected MessengerDriver $driver;
     protected ?StateStorage $stateStorage = null;
+    protected StateAccessor $state;
 
     /** Установить контекст выполнения контроллера.
      * Выставляет оба свойства — $message (рекомендуемое, симметрично с Flow)
@@ -40,6 +47,12 @@ abstract class Controller
         if ($message->type === ContentType::Action) {
             $this->finalizeKeyboardContext($message->action);
         }
+
+        $storage = $this->tryStateStorage();
+
+        $this->state = $storage !== null
+            ? new PersistentState($storage, $this->incomingMessage->chatId, $this->incomingMessage->driverName)
+            : new StateData();
     }
 
     /** Получить входящее сообщение.
