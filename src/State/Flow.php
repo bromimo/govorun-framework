@@ -3,6 +3,7 @@
 namespace Govorun\State;
 
 use Closure;
+use Govorun\Http\MakesHttpCalls;
 use Govorun\Messaging\Message;
 use Govorun\Support\Validator;
 use Govorun\Messaging\Keyboard;
@@ -19,6 +20,8 @@ use Govorun\Messaging\OutgoingMessage;
  */
 abstract class Flow
 {
+    use MakesHttpCalls;
+
     protected array $steps = [];
     protected array $interruptCommands = ['/start', '/cancel'];
     protected bool $interruptOnEvent = true;
@@ -419,7 +422,7 @@ abstract class Flow
 /** Контейнер данных состояния потока.
  * Хранит произвольные данные, собранные в процессе прохождения шагов Flow.
  */
-class StateData
+class StateData implements \Govorun\Contracts\StateAccessor
 {
     /** Создать экземпляр контейнера данных.
      * @param array $data Начальные данные
