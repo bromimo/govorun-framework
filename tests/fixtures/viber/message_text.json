@@ -1,0 +1,1 @@
+{"event":"message","timestamp":1457764198000,"chat_hostname":"SN-CHAT-46_","message_token":5098034272017990000,"sender":{"id":"01234567890A=","name":"John Smith","avatar":"https://example.com/avatar.jpg","language":"en","country":"US","api_version":8},"message":{"type":"text","text":"Привет, бот!"},"silent":false}
