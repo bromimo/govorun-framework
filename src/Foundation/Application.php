@@ -10,6 +10,7 @@ use Govorun\Log\LogServiceProvider;
 use Illuminate\Container\Container;
 use Govorun\Contracts\MessengerDriver;
 use Govorun\State\StateServiceProvider;
+use Govorun\Contracts\WebhookResponder;
 use Govorun\Events\EventServiceProvider;
 use Illuminate\Config\Repository as ConfigRepository;
 
@@ -246,6 +247,14 @@ class Application extends Container
             return WebhookResponse::forbidden();
         }
 
+        if ($driver instanceof WebhookResponder) {
+            $preflight = $driver->preflight($request);
+
+            if ($preflight !== null) {
+                return $preflight;
+            }
+        }
+
         $message = $driver->parseUpdate($request);
 
         try {
@@ -255,7 +264,7 @@ class Application extends Container
             );
 
             if ($flowHandler->handle($message)) {
-                return WebhookResponse::ok();
+                return WebhookResponse::ok($this->ackBody($driver));
             }
 
             $router = new Router($driver);
@@ -264,7 +273,16 @@ class Application extends Container
             $this->handleException($e, $message, $driver);
         }
 
-        return WebhookResponse::ok();
+        return WebhookResponse::ok($this->ackBody($driver));
+    }
+
+    /** Получить тело подтверждения от драйвера, если он его формирует.
+     * @param MessengerDriver $driver Драйвер мессенджера
+     * @return string Тело ответа или пустая строка
+     */
+    private function ackBody(MessengerDriver $driver): string
+    {
+        return $driver instanceof WebhookResponder ? $driver->ackBody() : '';
     }
 
     /** Обработать исключение, возникшее при обработке вебхука.
