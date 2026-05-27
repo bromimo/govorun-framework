@@ -3,6 +3,7 @@
 namespace Govorun\Console;
 
 use Illuminate\Console\Command;
+use Govorun\Exceptions\WebhookManualSetupException;
 
 /** Команда установки вебхуков для активных мессенджер-драйверов.
  * Перебирает настроенные драйверы и регистрирует вебхук-URL для каждого.
@@ -38,6 +39,8 @@ class WebhookInstallCommand extends Command
                     $this->error("Failed to install webhook for {$driverName}");
                     return self::FAILURE;
                 }
+            } catch (WebhookManualSetupException $e) {
+                $this->warn("{$driverName}: {$e->getMessage()}");
             } catch (\Throwable $e) {
                 $this->error("Error installing webhook for {$driverName}: {$e->getMessage()}");
                 return self::FAILURE;
