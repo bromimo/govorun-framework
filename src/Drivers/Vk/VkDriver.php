@@ -212,13 +212,72 @@ class VkDriver implements MessengerDriver, WebhookResponder
         );
     }
 
-    /** Заглушка клавиатуры — будет заменена в задаче сериализации клавиатур.
+    /** Построить клавиатуру в формате VK.
      * @param array<string, mixed> $keyboard Данные клавиатуры
-     * @return array<string, mixed> Клавиатура в формате VK
+     * @return array<string, mixed> Клавиатура VK (one_time, inline, buttons)
      */
     private function buildKeyboard(array $keyboard): array
     {
-        return ['buttons' => [], 'one_time' => false];
+        if ($keyboard['remove']) {
+            return ['buttons' => [], 'one_time' => true];
+        }
+
+        $inline = $keyboard['type'] === 'inline';
+        $rows = [];
+
+        foreach ($keyboard['rows'] as $row) {
+            $buttons = [];
+            foreach ($row as $btn) {
+                $buttons[] = $this->buildButton($btn, $inline);
+            }
+            $rows[] = $buttons;
+        }
+
+        $result = ['inline' => $inline, 'buttons' => $rows];
+
+        if (! $inline) {
+            $result['one_time'] = $keyboard['oneTime'];
+        }
+
+        return $result;
+    }
+
+    /** Построить одну кнопку в формате VK.
+     * @param array<string, mixed> $btn Данные кнопки
+     * @param bool $inline Inline-клавиатура (callback/openlink) или reply (text)
+     * @return array<string, mixed> Кнопка VK
+     */
+    private function buildButton(array $btn, bool $inline): array
+    {
+        if (isset($btn['url'])) {
+            return ['action' => [
+                'type' => 'openlink',
+                'label' => $btn['text'],
+                'link' => $btn['url'],
+            ]];
+        }
+
+        if ($inline && isset($btn['action'])) {
+            return ['action' => [
+                'type' => 'callback',
+                'label' => $btn['text'],
+                'payload' => json_encode(
+                    ['action' => $btn['action'], 'param' => $btn['param'] ?? []],
+                    JSON_UNESCAPED_UNICODE,
+                ),
+            ]];
+        }
+
+        $action = ['type' => 'text', 'label' => $btn['text']];
+
+        if (isset($btn['action'])) {
+            $action['payload'] = json_encode(
+                ['action' => $btn['action'], 'param' => $btn['param'] ?? []],
+                JSON_UNESCAPED_UNICODE,
+            );
+        }
+
+        return ['action' => $action, 'color' => 'secondary'];
     }
 
     /** Выполнить вызов VK API методом POST (form-параметры).
