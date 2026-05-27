@@ -12,6 +12,7 @@ use Govorun\Messaging\Dto\LocationDto;
 use Govorun\Messaging\IncomingMessage;
 use Govorun\Messaging\OutgoingMessage;
 use Govorun\Contracts\MessengerDriver;
+use Govorun\Drivers\Concerns\ConvertsHtmlToPlainText;
 
 /** Драйвер мессенджера Viber.
  * Реализует взаимодействие с Viber REST API: верификацию вебхука,
@@ -19,6 +20,8 @@ use Govorun\Contracts\MessengerDriver;
  */
 class ViberDriver implements MessengerDriver
 {
+    use ConvertsHtmlToPlainText;
+
     /** @var string Базовый URL Viber REST API */
     private const BASE_URL = 'https://chatapi.viber.com/pa/';
 
@@ -487,21 +490,4 @@ class ViberDriver implements MessengerDriver
         ];
     }
 
-    /** Преобразовать HTML-текст в обычный текст.
-     * Заменяет теги <a> на «текст (url)», удаляет остальные теги и декодирует HTML-сущности.
-     * @param string $html HTML-строка
-     * @return string Обычный текст
-     */
-    private function htmlToPlainText(string $html): string
-    {
-        $withLinks = preg_replace_callback(
-            '#<a\s+[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>#is',
-            fn ($m) => "{$m[2]} ({$m[1]})",
-            $html,
-        );
-
-        $stripped = strip_tags($withLinks);
-
-        return html_entity_decode($stripped, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-    }
 }

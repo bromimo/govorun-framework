@@ -7,6 +7,7 @@ use Govorun\Contracts\MessengerDriver;
 use Govorun\Foundation\Application;
 use Govorun\Tests\TestCase;
 use Symfony\Component\Console\Input\ArrayInput;
+use Govorun\Exceptions\WebhookManualSetupException;
 use Symfony\Component\Console\Output\BufferedOutput;
 
 class WebhookCommandsTest extends TestCase
@@ -138,5 +139,39 @@ class WebhookCommandsTest extends TestCase
 
         $this->assertSame(1, $exitCode);
         $this->assertStringContainsString('Error removing webhook for telegram: Connection refused', $output->fetch());
+    }
+
+    public function test_webhook_install_treats_manual_setup_as_warning(): void
+    {
+        $driver = $this->createMock(MessengerDriver::class);
+        $driver->expects($this->once())
+            ->method('installWebhook')
+            ->willThrowException(new WebhookManualSetupException('Настройте Callback API вручную'));
+
+        $this->app->instance('driver.telegram', $driver);
+
+        $artisan = $this->app->make('artisan');
+        $output = new BufferedOutput();
+        $exitCode = $artisan->run(new ArrayInput(['command' => 'webhook:install']), $output);
+
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('Настройте Callback API вручную', $output->fetch());
+    }
+
+    public function test_webhook_remove_treats_manual_setup_as_warning(): void
+    {
+        $driver = $this->createMock(MessengerDriver::class);
+        $driver->expects($this->once())
+            ->method('removeWebhook')
+            ->willThrowException(new WebhookManualSetupException('Удалите Callback API вручную'));
+
+        $this->app->instance('driver.telegram', $driver);
+
+        $artisan = $this->app->make('artisan');
+        $output = new BufferedOutput();
+        $exitCode = $artisan->run(new ArrayInput(['command' => 'webhook:remove']), $output);
+
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('Удалите Callback API вручную', $output->fetch());
     }
 }
