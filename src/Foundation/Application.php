@@ -5,6 +5,7 @@ namespace Govorun\Foundation;
 use Dotenv\Dotenv;
 use Govorun\Http\Request;
 use Govorun\Routing\Router;
+use Govorun\Http\WebhookResponse;
 use Govorun\Log\LogServiceProvider;
 use Govorun\Contracts\MessengerDriver;
 use Govorun\Events\EventServiceProvider;
@@ -226,10 +227,10 @@ class Application extends Container
      * Определяет драйвер, проверяет подпись, парсит сообщение,
      * пропускает через FlowHandler и маршрутизатор.
      * @param Request $request HTTP-запрос вебхука
-     * @return int HTTP-код ответа
+     * @return WebhookResponse Ответ с кодом статуса и телом
      * @throws \RuntimeException Если тип обновления не поддерживается драйвером
      */
-    public function handleWebhook(Request $request): int
+    public function handleWebhook(Request $request): WebhookResponse
     {
         $this->loadEnvironment();
         $this->loadConfiguration();
@@ -242,7 +243,7 @@ class Application extends Container
         $driver = $this->resolveDriver($driverName);
 
         if (! $driver->verifyWebhook($request)) {
-            return 403;
+            return WebhookResponse::forbidden();
         }
 
         $message = $driver->parseUpdate($request);
@@ -254,7 +255,7 @@ class Application extends Container
             );
 
             if ($flowHandler->handle($message)) {
-                return 200;
+                return WebhookResponse::ok();
             }
 
             $router = new Router($driver);
@@ -263,7 +264,7 @@ class Application extends Container
             $this->handleException($e, $message, $driver);
         }
 
-        return 200;
+        return WebhookResponse::ok();
     }
 
     /** Обработать исключение, возникшее при обработке вебхука.

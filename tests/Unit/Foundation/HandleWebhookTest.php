@@ -2,9 +2,10 @@
 
 namespace Govorun\Tests\Unit\Foundation;
 
+use Govorun\Http\Request;
 use Govorun\Contracts\MessengerDriver;
 use Govorun\Foundation\Application;
-use Govorun\Http\Request;
+use Govorun\Http\WebhookResponse;
 use Govorun\Messaging\ContentType;
 use Govorun\Messaging\Dto\UserDto;
 use Govorun\Messaging\IncomingMessage;
@@ -143,7 +144,8 @@ class HandleWebhookTest extends TestCase
 
         $result = $this->app->handleWebhook($request);
 
-        $this->assertSame(403, $result);
+        $this->assertSame(403, $result->status);
+        $this->assertSame('', $result->body);
         $this->assertEmpty($this->sent);
     }
 
@@ -164,7 +166,7 @@ class HandleWebhookTest extends TestCase
 
         $result = $this->app->handleWebhook($request);
 
-        $this->assertSame(200, $result);
+        $this->assertSame(200, $result->status);
         $this->assertCount(1, $this->sent);
     }
 
@@ -183,7 +185,7 @@ class HandleWebhookTest extends TestCase
 
         $result = $this->app->handleWebhook($request);
 
-        $this->assertSame(200, $result);
+        $this->assertSame(200, $result->status);
         $this->assertCount(1, $this->sent);
         // Default error message from config/app.php
         $this->assertSame('Произошла ошибка, попробуйте позже.', $this->sent[0]->text);
@@ -204,7 +206,7 @@ class HandleWebhookTest extends TestCase
 
         $result = $this->app->handleWebhook($request);
 
-        $this->assertSame(200, $result);
+        $this->assertSame(200, $result->status);
     }
 
     public function test_handle_exception_logs_error_when_logger_available(): void
