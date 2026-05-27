@@ -113,7 +113,23 @@ class VkDriver implements MessengerDriver, WebhookResponder
      */
     public function send(OutgoingMessage $message): ?string
     {
-        throw new \RuntimeException('not implemented yet');
+        $params = [
+            'peer_id' => $message->chatId,
+            'message' => $this->htmlToPlainText($message->text ?? ''),
+            'random_id' => random_int(1, PHP_INT_MAX),
+        ];
+
+        if ($message->keyboard !== null) {
+            $params['keyboard'] = json_encode($this->buildKeyboard($message->keyboard), JSON_UNESCAPED_UNICODE);
+        }
+
+        if ($message->media !== null && isset($message->media['url'])) {
+            $params['attachment'] = $message->media['url'];
+        }
+
+        $response = $this->apiCall('messages.send', $params);
+
+        return isset($response['response']) ? (string) $response['response'] : null;
     }
 
     /** Редактировать ранее отправленное сообщение.
@@ -123,7 +139,17 @@ class VkDriver implements MessengerDriver, WebhookResponder
      */
     public function edit(string $messageId, OutgoingMessage $message): void
     {
-        throw new \RuntimeException('not implemented yet');
+        $params = [
+            'peer_id' => $message->chatId,
+            'message_id' => (int) $messageId,
+            'message' => $this->htmlToPlainText($message->text ?? ''),
+        ];
+
+        if ($message->keyboard !== null) {
+            $params['keyboard'] = json_encode($this->buildKeyboard($message->keyboard), JSON_UNESCAPED_UNICODE);
+        }
+
+        $this->apiCall('messages.edit', $params);
     }
 
     /** Удалить сообщение из чата.
@@ -133,7 +159,10 @@ class VkDriver implements MessengerDriver, WebhookResponder
      */
     public function delete(string $messageId, string $chatId): void
     {
-        throw new \RuntimeException('not implemented yet');
+        $this->apiCall('messages.delete', [
+            'message_ids' => $messageId,
+            'delete_for_all' => 1,
+        ]);
     }
 
     /** Установить вебхук — VK требует ручной настройки Callback-сервера.
@@ -167,7 +196,72 @@ class VkDriver implements MessengerDriver, WebhookResponder
      */
     public function getUser(string $id): UserDto
     {
-        throw new \RuntimeException('not implemented yet');
+        $response = $this->apiCall('users.get', [
+            'user_ids' => $id,
+            'fields' => 'screen_name',
+        ]);
+
+        $data = $response['response'][0] ?? ['id' => $id];
+
+        return new UserDto(
+            id: (string) ($data['id'] ?? $id),
+            firstName: $data['first_name'] ?? null,
+            lastName: $data['last_name'] ?? null,
+            username: $data['screen_name'] ?? null,
+            raw: $data,
+        );
+    }
+
+    /** Заглушка клавиатуры — будет заменена в задаче сериализации клавиатур.
+     * @param array<string, mixed> $keyboard Данные клавиатуры
+     * @return array<string, mixed> Клавиатура в формате VK
+     */
+    private function buildKeyboard(array $keyboard): array
+    {
+        return ['buttons' => [], 'one_time' => false];
+    }
+
+    /** Выполнить вызов VK API методом POST (form-параметры).
+     * @param string $method Метод API (например, messages.send)
+     * @param array<string, mixed> $params Параметры запроса
+     * @return array<string, mixed> Декодированный ответ
+     * @throws \RuntimeException При ошибке VK API
+     */
+    private function apiCall(string $method, array $params): array
+    {
+        $params['access_token'] = $this->token;
+        $params['v'] = self::API_VERSION;
+
+        $response = $this->client->request('POST', self::BASE_URL . $method, [
+            'form_params' => $params,
+            'http_errors' => false,
+        ]);
+
+        return $this->assertOk($method, $response->getBody()->getContents());
+    }
+
+    /** Разобрать ответ VK API и убедиться в отсутствии ошибки.
+     * @param string $method Имя метода для текста ошибки
+     * @param string $body Сырое тело ответа
+     * @return array<string, mixed> Декодированный ответ
+     * @throws \RuntimeException Если присутствует error или тело не парсится
+     */
+    private function assertOk(string $method, string $body): array
+    {
+        $decoded = json_decode($body, true);
+
+        if (! is_array($decoded)) {
+            throw new \RuntimeException("VK {$method}: invalid response body — {$body}");
+        }
+
+        if (isset($decoded['error'])) {
+            $code = $decoded['error']['error_code'] ?? 0;
+            $msg = $decoded['error']['error_msg'] ?? 'unknown error';
+
+            throw new \RuntimeException("VK {$method} failed [{$code}]: {$msg}");
+        }
+
+        return $decoded;
     }
 
     /** Разобрать событие message_new в зависимости от содержимого.
