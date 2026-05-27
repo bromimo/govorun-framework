@@ -7,10 +7,10 @@ use Govorun\Http\Request;
 use Govorun\Routing\Router;
 use Govorun\Http\WebhookResponse;
 use Govorun\Log\LogServiceProvider;
-use Govorun\Contracts\MessengerDriver;
-use Govorun\Events\EventServiceProvider;
-use Govorun\State\StateServiceProvider;
 use Illuminate\Container\Container;
+use Govorun\Contracts\MessengerDriver;
+use Govorun\State\StateServiceProvider;
+use Govorun\Events\EventServiceProvider;
 use Illuminate\Config\Repository as ConfigRepository;
 
 /** Ядро приложения Govorun.
