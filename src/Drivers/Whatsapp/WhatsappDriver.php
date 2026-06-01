@@ -240,6 +240,95 @@ class WhatsappDriver implements MessengerDriver, WebhookResponder
         return new UserDto(id: $id, phone: $id);
     }
 
+    /** Прочитать бизнес-профиль.
+     * @return array Поля профиля (about/description/...)
+     * @throws \RuntimeException При ошибке API
+     */
+    public function getBusinessProfile(): array
+    {
+        $fields = 'about,address,description,email,profile_picture_url,websites,vertical';
+        $response = $this->apiCall("{$this->phoneNumberId}/whatsapp_business_profile", ['fields' => $fields], 'GET');
+
+        return $response['data'][0] ?? [];
+    }
+
+    /** Обновить бизнес-профиль (передаются только меняемые поля).
+     * @param array $fields Поля (about/description/address/email/websites/vertical/profile_picture_handle)
+     * @return void
+     * @throws \RuntimeException При ошибке API
+     */
+    public function setBusinessProfile(array $fields): void
+    {
+        $payload = array_merge(['messaging_product' => 'whatsapp'], $fields);
+        $this->apiCall("{$this->phoneNumberId}/whatsapp_business_profile", $payload);
+    }
+
+    /** Загрузить фото профиля через resumable upload и вернуть handle.
+     * @param string $path Абсолютный путь к файлу
+     * @return string Handle для profile_picture_handle
+     * @throws \RuntimeException Если файла нет или ошибка API
+     */
+    public function uploadProfilePhoto(string $path): string
+    {
+        if (! is_file($path)) {
+            throw new \RuntimeException("Profile photo file not found: {$path}");
+        }
+
+        $mime = mime_content_type($path) ?: 'image/jpeg';
+
+        $sessionResponse = $this->client->request('POST', $this->url("{$this->appId}/uploads"), [
+            'query' => [
+                'file_name' => basename($path),
+                'file_length' => filesize($path),
+                'file_type' => $mime,
+                'access_token' => $this->accessToken,
+            ],
+            'http_errors' => false,
+        ]);
+        $session = $this->assertOk("{$this->appId}/uploads", $sessionResponse->getBody()->getContents());
+        $sessionId = (string) ($session['id'] ?? '');
+
+        $uploadResponse = $this->client->request('POST', $this->url($sessionId), [
+            'headers' => [
+                'Authorization' => "OAuth {$this->accessToken}",
+                'file_offset' => '0',
+            ],
+            'body' => file_get_contents($path),
+            'http_errors' => false,
+        ]);
+        $uploaded = $this->assertOk($sessionId, $uploadResponse->getBody()->getContents());
+
+        return (string) ($uploaded['h'] ?? '');
+    }
+
+    /** Скачать бинарь входящего медиа по media id (2 шага: метаданные → файл).
+     * @param string $mediaId Идентификатор медиа из вебхука
+     * @return string Содержимое файла
+     * @throws \RuntimeException При ошибке
+     */
+    public function downloadMedia(string $mediaId): string
+    {
+        $meta = $this->apiCall($mediaId, [], 'GET');
+        $url = $meta['url'] ?? null;
+        if (! is_string($url) || $url === '') {
+            throw new \RuntimeException("WhatsApp media {$mediaId}: no URL in metadata.");
+        }
+
+        $response = $this->client->request('GET', $url, [
+            'headers' => [
+                'Authorization' => "Bearer {$this->accessToken}",
+                'User-Agent' => 'GovorunBot/1.0',
+            ],
+            'http_errors' => false,
+        ]);
+
+        if ($response->getStatusCode() !== 200) {
+            throw new \RuntimeException("WhatsApp media {$mediaId}: download failed [{$response->getStatusCode()}].");
+        }
+
+        return $response->getBody()->getContents();
+    }
+
     /** Текстовое сообщение.
      * @param array $message Сообщение
      * @param string $id WAMID
