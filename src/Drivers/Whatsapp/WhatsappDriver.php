@@ -140,7 +140,7 @@ class WhatsappDriver implements MessengerDriver, WebhookResponder
      */
     public function edit(string $messageId, OutgoingMessage $message): void
     {
-        throw new \RuntimeException('WhatsApp does not support editing messages.');
+        throw new \RuntimeException('WhatsApp не поддерживает редактирование сообщений.');
     }
 
     /** Удаление не поддерживается WhatsApp.
@@ -151,7 +151,7 @@ class WhatsappDriver implements MessengerDriver, WebhookResponder
      */
     public function delete(string $messageId, string $chatId): void
     {
-        throw new \RuntimeException('WhatsApp does not support deleting messages.');
+        throw new \RuntimeException('WhatsApp не поддерживает удаление сообщений.');
     }
 
     /** Автоустановка вебхука не поддерживается (настройка вручную в Meta App Dashboard).

@@ -62,6 +62,14 @@ class WhatsappDriverWebhookTest extends TestCase
         $this->assertFalse($this->driver()->verifyWebhook($invalid));
     }
 
+    public function test_verify_webhook_post_returns_false_when_signature_missing(): void
+    {
+        $body = '{"object":"whatsapp_business_account"}';
+        $request = new Request(server: ['REQUEST_METHOD' => 'POST'], content: $body);
+
+        $this->assertFalse($this->driver()->verifyWebhook($request));
+    }
+
     public function test_preflight_ignores_delivery_statuses(): void
     {
         $body = json_encode(['entry' => [['changes' => [['value' => ['statuses' => [['status' => 'read']]]]]]]]);
