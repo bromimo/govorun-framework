@@ -157,11 +157,33 @@ class WhatsappDriver implements MessengerDriver, WebhookResponder
     /** Отправить сообщение.
      * @param OutgoingMessage $message Сообщение
      * @return string|null WAMID или null
-     * @throws \Throwable
+     * @throws \RuntimeException При ошибке API
      */
     public function send(OutgoingMessage $message): ?string
     {
-        throw new \RuntimeException('not implemented');
+        $payload = [
+            'messaging_product' => 'whatsapp',
+            'recipient_type' => 'individual',
+            'to' => $message->chatId,
+        ];
+
+        $hasKeyboard = $message->keyboard !== null && ($message->keyboard['remove'] ?? false) !== true;
+
+        if ($hasKeyboard) {
+            $payload = array_merge($payload, $this->buildInteractive($message));
+        } elseif ($message->media !== null && isset($message->media['url'])) {
+            $payload = array_merge($payload, $this->buildMedia($message));
+        } else {
+            $payload['type'] = 'text';
+            $payload['text'] = [
+                'preview_url' => true,
+                'body' => $this->htmlToPlainText($message->text ?? ''),
+            ];
+        }
+
+        $response = $this->apiCall("{$this->phoneNumberId}/messages", $payload);
+
+        return $response['messages'][0]['id'] ?? null;
     }
 
     /** Редактирование не поддерживается WhatsApp.
@@ -346,6 +368,149 @@ class WhatsappDriver implements MessengerDriver, WebhookResponder
             ),
             raw: $message,
         );
+    }
+
+    /** Построить блок медиа Graph API.
+     * @param OutgoingMessage $message Сообщение
+     * @return array Часть payload (type + блок по типу)
+     */
+    private function buildMedia(OutgoingMessage $message): array
+    {
+        $map = [
+            'photo' => 'image', 'image' => 'image', 'video' => 'video',
+            'audio' => 'audio', 'voice' => 'audio', 'document' => 'document', 'animation' => 'video',
+        ];
+        $type = $map[$message->media['type'] ?? 'document'] ?? 'document';
+
+        $node = ['link' => $message->media['url']];
+        $caption = $this->htmlToPlainText($message->text ?? '');
+        if ($caption !== '' && $type !== 'audio') {
+            $node['caption'] = $caption;
+        }
+        if ($type === 'document' && isset($message->media['filename'])) {
+            $node['filename'] = $message->media['filename'];
+        }
+
+        return ['type' => $type, $type => $node];
+    }
+
+    /** Построить interactive-сообщение: ≤3 кнопок → button, 4–10 → list.
+     * @param OutgoingMessage $message Сообщение
+     * @return array Часть payload (type=interactive + interactive)
+     */
+    private function buildInteractive(OutgoingMessage $message): array
+    {
+        $buttons = $this->flattenButtons($message->keyboard['rows'] ?? []);
+        $bodyText = $this->htmlToPlainText($message->text ?? '');
+        if ($bodyText === '') {
+            $bodyText = ' ';
+        }
+
+        if (count($buttons) <= 3) {
+            $replies = array_map(
+                fn (array $b) => ['type' => 'reply', 'reply' => ['id' => $this->buttonId($b), 'title' => $b['text']]],
+                $buttons,
+            );
+
+            return ['type' => 'interactive', 'interactive' => [
+                'type' => 'button',
+                'body' => ['text' => $bodyText],
+                'action' => ['buttons' => $replies],
+            ]];
+        }
+
+        $rows = array_map(
+            fn (array $b) => ['id' => $this->buttonId($b), 'title' => $b['text']],
+            $buttons,
+        );
+
+        return ['type' => 'interactive', 'interactive' => [
+            'type' => 'list',
+            'body' => ['text' => $bodyText],
+            'action' => ['button' => 'Меню', 'sections' => [['rows' => $rows]]],
+        ]];
+    }
+
+    /** Сплющить двумерный массив рядов кнопок в плоский список.
+     * @param array $rows Ряды кнопок
+     * @return array Плоский список кнопок
+     */
+    private function flattenButtons(array $rows): array
+    {
+        $flat = [];
+        foreach ($rows as $row) {
+            foreach ((array) $row as $btn) {
+                $flat[] = $btn;
+            }
+        }
+
+        return $flat;
+    }
+
+    /** Идентификатор кнопки для WhatsApp (action или текст).
+     * @param array $btn Кнопка (Button->toArray())
+     * @return string Идентификатор
+     */
+    private function buttonId(array $btn): string
+    {
+        return (string) ($btn['action'] ?? $btn['text'] ?? '');
+    }
+
+    /** Вызвать Graph API (Bearer JSON для POST, query для GET).
+     * @param string $path Путь относительно версии
+     * @param array $payload Тело/параметры
+     * @param string $method HTTP-метод
+     * @return array Декодированный ответ
+     * @throws \RuntimeException При ошибке API
+     */
+    private function apiCall(string $path, array $payload, string $method = 'POST'): array
+    {
+        $options = [
+            'headers' => ['Authorization' => "Bearer {$this->accessToken}"],
+            'http_errors' => false,
+        ];
+        if ($method === 'POST') {
+            $options['json'] = $payload;
+        } elseif (! empty($payload)) {
+            $options['query'] = $payload;
+        }
+
+        $response = $this->client->request($method, $this->url($path), $options);
+
+        return $this->assertOk($path, $response->getBody()->getContents());
+    }
+
+    /** Построить полный URL Graph API.
+     * @param string $path Путь относительно версии
+     * @return string Полный URL
+     */
+    private function url(string $path): string
+    {
+        return self::BASE_URL . $this->apiVersion . '/' . ltrim($path, '/');
+    }
+
+    /** Проверить ответ Graph API.
+     * @param string $path Путь (для текста ошибки)
+     * @param string $body Сырое тело ответа
+     * @return array Декодированный ответ
+     * @throws \RuntimeException Если тело не парсится или есть error
+     */
+    private function assertOk(string $path, string $body): array
+    {
+        $decoded = json_decode($body, true);
+
+        if (! is_array($decoded)) {
+            throw new \RuntimeException("WhatsApp {$path}: invalid response body — {$body}");
+        }
+
+        if (isset($decoded['error'])) {
+            $code = $decoded['error']['code'] ?? 0;
+            $msg = $decoded['error']['message'] ?? 'unknown error';
+
+            throw new \RuntimeException("WhatsApp {$path} failed [{$code}]: {$msg}");
+        }
+
+        return $decoded;
     }
 
     /** Извлечь value из конверта вебхука.
