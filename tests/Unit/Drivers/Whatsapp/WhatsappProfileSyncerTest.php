@@ -49,4 +49,12 @@ class WhatsappProfileSyncerTest extends TestCase
         $syncer = $this->syncer($driver, ['websites' => ['https://a.com']]);
         $this->assertTrue($syncer->sync('websites'));
     }
+
+    public function test_sync_unknown_section_throws(): void
+    {
+        $driver = $this->createMock(WhatsappDriver::class);
+
+        $this->expectException(\RuntimeException::class);
+        $this->syncer($driver)->sync('nonexistent');
+    }
 }
