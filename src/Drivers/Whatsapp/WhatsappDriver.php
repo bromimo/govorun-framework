@@ -5,9 +5,13 @@ namespace Govorun\Drivers\Whatsapp;
 use Govorun\Http\Request;
 use GuzzleHttp\ClientInterface;
 use Govorun\Http\WebhookResponse;
+use Govorun\Messaging\ContentType;
 use Govorun\Messaging\Dto\UserDto;
+use Govorun\Messaging\Dto\MediaDto;
 use Govorun\Messaging\IncomingMessage;
 use Govorun\Messaging\OutgoingMessage;
+use Govorun\Messaging\Dto\ContactDto;
+use Govorun\Messaging\Dto\LocationDto;
 use Govorun\Contracts\MessengerDriver;
 use Govorun\Contracts\WebhookResponder;
 use Govorun\Exceptions\WebhookManualSetupException;
@@ -115,11 +119,39 @@ class WhatsappDriver implements MessengerDriver, WebhookResponder
     /** Разобрать вебхук в нормализованное сообщение.
      * @param Request $request Входящий запрос
      * @return IncomingMessage Сообщение
-     * @throws \RuntimeException Если тип не поддержан
+     * @throws \RuntimeException Если тип не поддержан или сообщение отсутствует
      */
     public function parseUpdate(Request $request): IncomingMessage
     {
-        throw new \RuntimeException('not implemented');
+        $value = $this->extractValue($request->json());
+        $message = $value['messages'][0] ?? null;
+
+        if ($message === null) {
+            throw new \RuntimeException('WhatsApp: no message in webhook payload');
+        }
+
+        $chatId = (string) ($message['from'] ?? '');
+        $messageId = (string) ($message['id'] ?? '');
+        $type = (string) ($message['type'] ?? '');
+        $contact = $value['contacts'][0] ?? [];
+
+        $user = new UserDto(
+            id: $chatId,
+            firstName: $contact['profile']['name'] ?? null,
+            phone: $chatId,
+            raw: $contact,
+        );
+
+        return match ($type) {
+            'text'        => $this->buildText($message, $messageId, $chatId, $user),
+            'interactive' => $this->parseInteractive($message, $messageId, $chatId, $user),
+            'button'      => $this->buildButtonReply($message, $messageId, $chatId, $user),
+            'image', 'video', 'audio', 'voice', 'document', 'sticker'
+                          => $this->parseMedia($message, $type, $messageId, $chatId, $user),
+            'location'    => $this->parseLocation($message, $messageId, $chatId, $user),
+            'contacts'    => $this->parseContact($message, $messageId, $chatId, $user),
+            default       => throw new \RuntimeException("Unsupported WhatsApp message type: {$type}"),
+        };
     }
 
     /** Отправить сообщение.
@@ -184,6 +216,136 @@ class WhatsappDriver implements MessengerDriver, WebhookResponder
     public function getUser(string $id): UserDto
     {
         return new UserDto(id: $id, phone: $id);
+    }
+
+    /** Текстовое сообщение.
+     * @param array $message Сообщение
+     * @param string $id WAMID
+     * @param string $chatId Телефон
+     * @param UserDto $user Пользователь
+     * @return IncomingMessage
+     */
+    private function buildText(array $message, string $id, string $chatId, UserDto $user): IncomingMessage
+    {
+        return new IncomingMessage(
+            id: $id, chatId: $chatId, driverName: 'whatsapp',
+            text: $message['text']['body'] ?? '', user: $user, type: ContentType::Text,
+            raw: $message,
+        );
+    }
+
+    /** Нажатие interactive-кнопки (button_reply/list_reply) → Action.
+     * @param array $message Сообщение
+     * @param string $id WAMID
+     * @param string $chatId Телефон
+     * @param UserDto $user Пользователь
+     * @return IncomingMessage
+     */
+    private function parseInteractive(array $message, string $id, string $chatId, UserDto $user): IncomingMessage
+    {
+        $interactive = $message['interactive'] ?? [];
+        $reply = $interactive['button_reply'] ?? $interactive['list_reply'] ?? [];
+
+        return new IncomingMessage(
+            id: $id, chatId: $chatId, driverName: 'whatsapp',
+            text: null, user: $user, type: ContentType::Action,
+            action: (string) ($reply['id'] ?? ''), actionParams: [], raw: $message,
+        );
+    }
+
+    /** Ответ на quick-reply кнопку шаблона → Action.
+     * @param array $message Сообщение
+     * @param string $id WAMID
+     * @param string $chatId Телефон
+     * @param UserDto $user Пользователь
+     * @return IncomingMessage
+     */
+    private function buildButtonReply(array $message, string $id, string $chatId, UserDto $user): IncomingMessage
+    {
+        $action = (string) ($message['button']['payload'] ?? $message['button']['text'] ?? '');
+
+        return new IncomingMessage(
+            id: $id, chatId: $chatId, driverName: 'whatsapp',
+            text: null, user: $user, type: ContentType::Action,
+            action: $action, actionParams: [], raw: $message,
+        );
+    }
+
+    /** Медиа: заполняем fileId (бинарь тянется лениво через downloadMedia).
+     * @param array $message Сообщение
+     * @param string $type Тип WhatsApp
+     * @param string $id WAMID
+     * @param string $chatId Телефон
+     * @param UserDto $user Пользователь
+     * @return IncomingMessage
+     */
+    private function parseMedia(array $message, string $type, string $id, string $chatId, UserDto $user): IncomingMessage
+    {
+        $typeMap = [
+            'image' => 'photo', 'video' => 'video', 'audio' => 'audio',
+            'voice' => 'voice', 'document' => 'document', 'sticker' => 'photo',
+        ];
+        $data = $message[$type] ?? [];
+
+        return new IncomingMessage(
+            id: $id, chatId: $chatId, driverName: 'whatsapp',
+            text: $data['caption'] ?? null, user: $user, type: ContentType::Media,
+            media: new MediaDto(
+                type: $typeMap[$type] ?? $type,
+                fileId: $data['id'] ?? null,
+                mimeType: $data['mime_type'] ?? null,
+                fileSize: $data['file_size'] ?? null,
+                raw: $data,
+            ),
+            raw: $message,
+        );
+    }
+
+    /** Геолокация.
+     * @param array $message Сообщение
+     * @param string $id WAMID
+     * @param string $chatId Телефон
+     * @param UserDto $user Пользователь
+     * @return IncomingMessage
+     */
+    private function parseLocation(array $message, string $id, string $chatId, UserDto $user): IncomingMessage
+    {
+        $loc = $message['location'] ?? [];
+
+        return new IncomingMessage(
+            id: $id, chatId: $chatId, driverName: 'whatsapp',
+            text: null, user: $user, type: ContentType::Location,
+            location: new LocationDto(
+                latitude: (float) ($loc['latitude'] ?? 0),
+                longitude: (float) ($loc['longitude'] ?? 0),
+                raw: $loc,
+            ),
+            raw: $message,
+        );
+    }
+
+    /** Контакт (первый из массива).
+     * @param array $message Сообщение
+     * @param string $id WAMID
+     * @param string $chatId Телефон
+     * @param UserDto $user Пользователь
+     * @return IncomingMessage
+     */
+    private function parseContact(array $message, string $id, string $chatId, UserDto $user): IncomingMessage
+    {
+        $c = $message['contacts'][0] ?? [];
+
+        return new IncomingMessage(
+            id: $id, chatId: $chatId, driverName: 'whatsapp',
+            text: null, user: $user, type: ContentType::Contact,
+            contact: new ContactDto(
+                phone: (string) ($c['phones'][0]['phone'] ?? ''),
+                firstName: $c['name']['first_name'] ?? null,
+                lastName: $c['name']['last_name'] ?? null,
+                raw: $c,
+            ),
+            raw: $message,
+        );
     }
 
     /** Извлечь value из конверта вебхука.
