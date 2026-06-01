@@ -10,8 +10,8 @@ use Govorun\Messaging\IncomingMessage;
 use Govorun\Messaging\OutgoingMessage;
 use Govorun\Contracts\MessengerDriver;
 use Govorun\Contracts\WebhookResponder;
-use Govorun\Drivers\Concerns\ConvertsHtmlToPlainText;
 use Govorun\Exceptions\WebhookManualSetupException;
+use Govorun\Drivers\Concerns\ConvertsHtmlToPlainText;
 
 /** Драйвер WhatsApp Cloud API (Meta Graph API).
  * Реактивный режим: приём сообщений, отправка текста/медиа/интерактивных клавиатур,
