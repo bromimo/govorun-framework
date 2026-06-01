@@ -84,18 +84,29 @@ class WhatsappDriverApiTest extends TestCase
 
         $bytes = $driver->downloadMedia('MEDIA_1');
 
+        $metaRequest = $this->history[0]['request'];
+        $this->assertSame('GET', $metaRequest->getMethod());
+        $this->assertStringContainsString('MEDIA_1', (string) $metaRequest->getUri());
         $this->assertSame('RAWBYTES', $bytes);
         $binaryRequest = $this->history[1]['request'];
         $this->assertSame('Bearer TOK', $binaryRequest->getHeaderLine('Authorization'));
         $this->assertNotSame('', $binaryRequest->getHeaderLine('User-Agent'));
     }
 
-    public function test_edit_and_delete_throw(): void
+    public function test_edit_throws_not_supported(): void
     {
         $driver = $this->driverWith([]);
 
         $this->expectException(\RuntimeException::class);
         $driver->edit('1', new OutgoingMessage());
+    }
+
+    public function test_delete_throws_not_supported(): void
+    {
+        $driver = $this->driverWith([]);
+
+        $this->expectException(\RuntimeException::class);
+        $driver->delete('1', '79990000000');
     }
 
     public function test_install_webhook_throws_manual_setup(): void

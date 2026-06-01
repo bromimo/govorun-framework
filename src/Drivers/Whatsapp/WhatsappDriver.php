@@ -276,10 +276,15 @@ class WhatsappDriver implements MessengerDriver, WebhookResponder
 
         $mime = mime_content_type($path) ?: 'image/jpeg';
 
+        $fileSize = filesize($path);
+        if ($fileSize === false) {
+            throw new \RuntimeException("Не удалось определить размер файла: {$path}");
+        }
+
         $sessionResponse = $this->client->request('POST', $this->url("{$this->appId}/uploads"), [
             'query' => [
                 'file_name' => basename($path),
-                'file_length' => filesize($path),
+                'file_length' => $fileSize,
                 'file_type' => $mime,
                 'access_token' => $this->accessToken,
             ],
@@ -288,12 +293,17 @@ class WhatsappDriver implements MessengerDriver, WebhookResponder
         $session = $this->assertOk("{$this->appId}/uploads", $sessionResponse->getBody()->getContents());
         $sessionId = (string) ($session['id'] ?? '');
 
+        $content = file_get_contents($path);
+        if ($content === false) {
+            throw new \RuntimeException("Не удалось прочитать файл: {$path}");
+        }
+
         $uploadResponse = $this->client->request('POST', $this->url($sessionId), [
             'headers' => [
                 'Authorization' => "OAuth {$this->accessToken}",
                 'file_offset' => '0',
             ],
-            'body' => file_get_contents($path),
+            'body' => $content,
             'http_errors' => false,
         ]);
         $uploaded = $this->assertOk($sessionId, $uploadResponse->getBody()->getContents());
