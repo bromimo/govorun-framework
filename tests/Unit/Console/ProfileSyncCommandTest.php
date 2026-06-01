@@ -293,5 +293,6 @@ class ProfileSyncCommandTest extends TestCase
         $this->assertSame(0, $exitCode, $text);
         $this->assertStringContainsString('[telegram]', $text);
         $this->assertStringContainsString('[whatsapp]', $text);
+        $this->assertStringContainsString('about', $text);
     }
 }
