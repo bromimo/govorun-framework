@@ -6,10 +6,11 @@ use Govorun\Tests\TestCase;
 use Govorun\Foundation\Application;
 use Govorun\Console\ConsoleServiceProvider;
 use Govorun\Drivers\Telegram\TelegramDriver;
+use Govorun\Drivers\Whatsapp\WhatsappDriver;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 
-/** Тесты artisan-команды `bot:profile-sync` синхронизации Telegram-профиля бота. */
+/** Тесты artisan-команды `bot:profile-sync` синхронизации профиля бота. */
 class ProfileSyncCommandTest extends TestCase
 {
     private Application $app;
@@ -42,6 +43,14 @@ class ProfileSyncCommandTest extends TestCase
         return $driver;
     }
 
+    private function bindWhatsappDriver(): WhatsappDriver
+    {
+        $driver = $this->createMock(WhatsappDriver::class);
+        $this->app->instance('driver.whatsapp', $driver);
+
+        return $driver;
+    }
+
     public function test_sync_calls_all_text_methods(): void
     {
         $driver = $this->bindDriver();
@@ -64,6 +73,7 @@ class ProfileSyncCommandTest extends TestCase
 
         $text = $output->fetch();
         $this->assertSame(0, $exitCode, $text);
+        $this->assertStringContainsString('[telegram]', $text);
         $this->assertStringContainsString('✓ name', $text);
     }
 
@@ -132,9 +142,14 @@ class ProfileSyncCommandTest extends TestCase
         $this->assertSame(0, $exitCode);
     }
 
-    public function test_sync_invalid_only_returns_failure(): void
+    public function test_sync_only_unknown_section_results_in_no_synced_sections(): void
     {
-        $this->bindDriver();
+        $driver = $this->bindDriver();
+        $driver->expects($this->never())->method('setMyName');
+        $driver->expects($this->never())->method('setMyShortDescription');
+        $driver->expects($this->never())->method('setMyDescription');
+        $driver->expects($this->never())->method('setMyCommands');
+        $driver->expects($this->never())->method('removeMyProfilePhoto');
 
         $artisan = $this->app->make('artisan');
         $output = new BufferedOutput();
@@ -143,8 +158,8 @@ class ProfileSyncCommandTest extends TestCase
             '--only' => ['bogus'],
         ]), $output);
 
-        $this->assertSame(1, $exitCode);
-        $this->assertStringContainsString('Неизвестные секции: bogus', $output->fetch());
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('Профиль синхронизирован', $output->fetch());
     }
 
     public function test_sync_continues_on_error_and_reports(): void
@@ -179,7 +194,8 @@ class ProfileSyncCommandTest extends TestCase
         $exitCode = $artisan->run(new ArrayInput(['command' => 'bot:profile-sync']), $output);
 
         $this->assertSame(1, $exitCode);
-        $this->assertStringContainsString('Профиль не найден', $output->fetch());
+        $text = $output->fetch();
+        $this->assertStringContainsString('не сконфигурирован', $text);
     }
 
     public function test_sync_without_token_returns_failure(): void
@@ -192,7 +208,8 @@ class ProfileSyncCommandTest extends TestCase
         $exitCode = $artisan->run(new ArrayInput(['command' => 'bot:profile-sync']), $output);
 
         $this->assertSame(1, $exitCode);
-        $this->assertStringContainsString('Telegram-токен не задан', $output->fetch());
+        $text = $output->fetch();
+        $this->assertStringContainsString('не сконфигурирован', $text);
     }
 
     public function test_sync_photo_uses_static_when_jpg_exists(): void
@@ -229,5 +246,52 @@ class ProfileSyncCommandTest extends TestCase
         } finally {
             @unlink($mp4);
         }
+    }
+
+    public function test_sync_whatsapp_messenger_without_profile_returns_failure(): void
+    {
+        $this->bindWhatsappDriver();
+        app('config')->set('whatsapp_profile', null);
+        app('config')->set('messenger.whatsapp.access_token', 'some-token');
+
+        $artisan = $this->app->make('artisan');
+        $output = new BufferedOutput();
+        $exitCode = $artisan->run(new ArrayInput([
+            'command' => 'bot:profile-sync',
+            '--messenger' => ['whatsapp'],
+        ]), $output);
+
+        $this->assertSame(1, $exitCode);
+        $text = $output->fetch();
+        $this->assertStringContainsString('не сконфигурирован', $text);
+    }
+
+    public function test_sync_multi_messenger_outputs_both_sections(): void
+    {
+        app('config')->set('messenger.drivers', ['telegram', 'whatsapp']);
+        app('config')->set('messenger.whatsapp.access_token', 'wa-token');
+        app('config')->set('whatsapp_profile', ['about' => 'WA about']);
+
+        $tgDriver = $this->bindDriver();
+        $tgDriver->method('getMyName')->willReturn('Test Bot');
+        $tgDriver->method('getMyShortDescription')->willReturn('About test');
+        $tgDriver->method('getMyDescription')->willReturn('Long description for test');
+        $tgDriver->method('getMyCommands')->willReturn([
+            ['command' => 'start', 'description' => 'Start the bot'],
+            ['command' => 'help',  'description' => 'Show help'],
+        ]);
+        $tgDriver->method('removeMyProfilePhoto');
+
+        $waDriver = $this->bindWhatsappDriver();
+        $waDriver->method('getBusinessProfile')->willReturn(['about' => 'old-about']);
+
+        $artisan = $this->app->make('artisan');
+        $output = new BufferedOutput();
+        $exitCode = $artisan->run(new ArrayInput(['command' => 'bot:profile-sync']), $output);
+
+        $text = $output->fetch();
+        $this->assertSame(0, $exitCode, $text);
+        $this->assertStringContainsString('[telegram]', $text);
+        $this->assertStringContainsString('[whatsapp]', $text);
     }
 }
