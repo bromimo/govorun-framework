@@ -431,16 +431,18 @@ class WhatsappDriver implements MessengerDriver, WebhookResponder
         ]];
     }
 
-    /** Сплющить двумерный массив рядов кнопок в плоский список.
+    /** Сплющить двумерный массив рядов кнопок в плоский список, исключая url-кнопки.
      * @param array $rows Ряды кнопок
-     * @return array Плоский список кнопок
+     * @return array Плоский список кнопок (без url-типа)
      */
     private function flattenButtons(array $rows): array
     {
         $flat = [];
         foreach ($rows as $row) {
             foreach ((array) $row as $btn) {
-                $flat[] = $btn;
+                if (($btn['type'] ?? '') !== 'url') {
+                    $flat[] = $btn;
+                }
             }
         }
 

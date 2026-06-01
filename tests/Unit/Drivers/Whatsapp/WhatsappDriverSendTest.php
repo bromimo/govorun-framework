@@ -123,6 +123,50 @@ class WhatsappDriverSendTest extends TestCase
         $this->assertSame('A', $rows[0]['title']);
     }
 
+    public function test_send_keyboard_with_remove_sends_text(): void
+    {
+        $driver = $this->driverWith([$this->okResponse()]);
+
+        $msg = $this->outgoing('Текст');
+        $msg->keyboard = array_merge(
+            Keyboard::make()->buttons([[Button::make('Да')->action('yes')]])->toArray(),
+            ['remove' => true]
+        );
+        $driver->send($msg);
+
+        $body = $this->lastBody();
+        $this->assertSame('text', $body['type']);
+        $this->assertSame('Текст', $body['text']['body']);
+    }
+
+    public function test_send_keyboard_exactly_three_buttons_is_button_type(): void
+    {
+        $driver = $this->driverWith([$this->okResponse()]);
+
+        $msg = $this->outgoing('Выбор');
+        $msg->keyboard = Keyboard::make()->buttons([
+            [Button::make('A')->action('a'), Button::make('B')->action('b'), Button::make('C')->action('c')],
+        ])->toArray();
+        $driver->send($msg);
+
+        $body = $this->lastBody();
+        $this->assertSame('button', $body['interactive']['type']);
+    }
+
+    public function test_send_keyboard_exactly_four_buttons_is_list_type(): void
+    {
+        $driver = $this->driverWith([$this->okResponse()]);
+
+        $msg = $this->outgoing('Выбор');
+        $msg->keyboard = Keyboard::make()->buttons([
+            [Button::make('A')->action('a'), Button::make('B')->action('b'), Button::make('C')->action('c'), Button::make('D')->action('d')],
+        ])->toArray();
+        $driver->send($msg);
+
+        $body = $this->lastBody();
+        $this->assertSame('list', $body['interactive']['type']);
+    }
+
     public function test_send_throws_on_api_error(): void
     {
         $driver = $this->driverWith([new Response(200, [], json_encode([
