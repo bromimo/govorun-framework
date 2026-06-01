@@ -100,6 +100,17 @@ class WhatsappDriverParseTest extends TestCase
         $this->assertSame('Пётр', $msg->contact->firstName);
     }
 
+    public function test_parses_button_quick_reply_as_action(): void
+    {
+        $msg = $this->driver()->parseUpdate($this->event([
+            'from' => '7999', 'id' => 'wamid.8', 'type' => 'button',
+            'button' => ['payload' => 'confirm', 'text' => 'Подтвердить'],
+        ]));
+
+        $this->assertSame(ContentType::Action, $msg->type);
+        $this->assertSame('confirm', $msg->action);
+    }
+
     public function test_throws_on_unsupported_type(): void
     {
         $this->expectException(\RuntimeException::class);

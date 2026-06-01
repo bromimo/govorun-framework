@@ -294,7 +294,7 @@ class WhatsappDriver implements MessengerDriver, WebhookResponder
                 type: $typeMap[$type] ?? $type,
                 fileId: $data['id'] ?? null,
                 mimeType: $data['mime_type'] ?? null,
-                fileSize: $data['file_size'] ?? null,
+                fileSize: isset($data['file_size']) ? (int) $data['file_size'] : null,
                 raw: $data,
             ),
             raw: $message,
